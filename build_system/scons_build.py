@@ -541,6 +541,8 @@ def main():
                         help='Add embed markers to README files after building')
     parser.add_argument('--inject-embeds', action='store_true',
                         help='Inject actual embeds into README files (replaces markers)')
+    parser.add_argument('--continue-on-error', action='store_true',
+                        help='Continue and create website even if some projects fail to build')
     
     args = parser.parse_args()
     
@@ -588,7 +590,15 @@ def main():
                 if result.returncode != 0:
                     print(f"{Colors.YELLOW}⚠️  Embed injection completed with warnings{Colors.NC}")
         
-        sys.exit(0 if success else 1)
+        # Exit with appropriate code
+        if args.continue_on_error:
+            # Always exit successfully when continue-on-error is set
+            if not success:
+                print(f"{Colors.YELLOW}⚠️  Some builds failed but continuing due to --continue-on-error flag{Colors.NC}")
+            sys.exit(0)
+        else:
+            # Traditional behavior: fail if any builds failed
+            sys.exit(0 if success else 1)
         
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}Build interrupted by user{Colors.NC}")
