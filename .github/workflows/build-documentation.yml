@@ -12,23 +12,16 @@ on:
         required: false
         default: false
         type: boolean
-      target_subset:
-        description: 'Build subset (all, 2d, 3d, gui, audio, misc)'
+      godot_version:
+        description: 'Godot version to use for building'
         required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - 2d
-          - 3d
-          - gui
-          - audio
-          - misc
+        default: '4.4.1'
+        type: string
 
 env:
-  GODOT_VERSION: "4.4.1"
-  GODOT_VERSION_STABLE: "4.4.1-stable"
-  GODOT_TEMPLATE_VERSION: "4.4.1.stable"
+  GODOT_VERSION: ${{ github.event.inputs.godot_version || '4.4.1' }}
+  GODOT_VERSION_STABLE: ${{ github.event.inputs.godot_version || '4.4.1' }}-stable
+  GODOT_TEMPLATE_VERSION: ${{ github.event.inputs.godot_version || '4.4.1' }}.stable
   PYTHON_VERSION: "3.11"
 
 jobs:
@@ -86,24 +79,10 @@ jobs:
           fi
 
   build-projects:
-    name: 🏗️ Build Godot Projects
+    name: 🏗️ Build All Godot Projects
     runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.build-needed == 'true'
-    strategy:
-      matrix:
-        subset: ['2d', '3d', 'gui', 'audio', 'misc']
-        include:
-          - subset: '2d'
-            pattern: 'godot-demo-projects/2d/*'
-          - subset: '3d'
-            pattern: 'godot-demo-projects/3d/*'
-          - subset: 'gui'
-            pattern: 'godot-demo-projects/gui/*'
-          - subset: 'audio'
-            pattern: 'godot-demo-projects/audio/*'
-          - subset: 'misc'
-            pattern: 'godot-demo-projects/{compute,loading,misc,mobile,networking,plugins,viewport,xr}/*'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -190,31 +169,24 @@ jobs:
           path: |
             .build_cache
             build_system/cache
-          key: ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-${{ matrix.subset }}-${{ hashFiles('godot-demo-projects/**/*.godot') }}
+          key: ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-all-${{ hashFiles('godot-demo-projects/**/*.godot') }}
           restore-keys: |
-            ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-${{ matrix.subset }}-
+            ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-all-
             ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-
 
-      - name: Build projects subset
+      - name: Build all Godot projects
         run: |
-          # Set target subset if specified
-          TARGET_SUBSET="${{ github.event.inputs.target_subset || 'all' }}"
-          if [ "$TARGET_SUBSET" != "all" ] && [ "$TARGET_SUBSET" != "${{ matrix.subset }}" ]; then
-            echo "Skipping ${{ matrix.subset }} as target is $TARGET_SUBSET"
-            exit 0
-          fi
+          echo "🏗️ Building all Godot projects with parallel processing..."
           
-          # Build projects for this subset
+          # Build all projects
           python build_system/scons_build.py \
             --projects-dir godot-demo-projects \
             --godot-binary godot \
             --godot-version ${{ env.GODOT_VERSION }} \
-            --jobs 2 \
+            --jobs 4 \
             --cache-dir .build_cache \
             ${{ github.event.inputs.force_rebuild == 'true' && '--force-rebuild' || '' }} \
             --verbose
-        env:
-          SUBSET_PATTERN: ${{ matrix.pattern }}
 
       - name: Run embed injection
         run: |
@@ -228,14 +200,14 @@ jobs:
 
       - name: Check build results
         run: |
-          echo "🎯 Build Results for ${{ matrix.subset }}:"
+          echo "🎯 Build Results for all projects:"
           find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l | xargs -I {} echo "  Built {} WASM files"
           find godot-demo-projects -name "index.html" -path "*/exports/*" | wc -l | xargs -I {} echo "  Created {} web exports"
 
       - name: Archive build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: godot-exports-${{ matrix.subset }}
+          name: godot-exports-all
           path: |
             godot-demo-projects/*/exports/
             !godot-demo-projects/*/exports/**/*.tmp
@@ -252,7 +224,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs-${{ matrix.subset }}
+          name: build-logs-all
           path: |
             .build_cache/build_cache.json
             build_system/logs/
@@ -283,20 +255,8 @@ jobs:
         if: needs.build-projects.result == 'success'
         uses: actions/download-artifact@v4
         with:
-          pattern: godot-exports-*
-          path: ./artifacts
-          merge-multiple: true
-
-      - name: Restore build artifacts
-        if: needs.build-projects.result == 'success'
-        run: |
-          # Merge all subset artifacts back into the main structure
-          for subset_dir in artifacts/godot-exports-*/; do
-            if [ -d "$subset_dir" ]; then
-              echo "Restoring artifacts from $subset_dir"
-              cp -r "$subset_dir"/* ./ 2>/dev/null || true
-            fi
-          done
+          name: godot-exports-all
+          path: ./
 
       - name: Generate documentation
         run: |
