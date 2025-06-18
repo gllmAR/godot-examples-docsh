@@ -1,0 +1,270 @@
+name: 🧹 Maintenance
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Maintenance task to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - cleanup-cache
+          - update-dependencies
+          - validate-projects
+          - security-audit
+
+jobs:
+  cleanup-cache:
+    name: 🗑️ Cleanup Build Cache
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'cleanup-cache' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Cleanup old cache entries
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: caches } = await github.rest.actions.getActionsCaches({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            
+            for (const cache of caches.actions_caches) {
+              const lastAccessed = new Date(cache.last_accessed_at);
+              if (lastAccessed < oneWeekAgo) {
+                console.log(`Deleting old cache: ${cache.key}`);
+                try {
+                  await github.rest.actions.deleteActionsCacheById({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    cache_id: cache.id
+                  });
+                } catch (error) {
+                  console.log(`Failed to delete cache ${cache.key}: ${error.message}`);
+                }
+              }
+            }
+
+  update-dependencies:
+    name: 📦 Update Dependencies
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'update-dependencies' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Check for Python dependency updates
+        run: |
+          pip install pip-check-updates
+          
+          echo "📦 Current dependencies:"
+          cat requirements.txt
+          
+          echo -e "\n🔍 Checking for updates..."
+          pip-check-updates --requirements requirements.txt
+
+      - name: Check Godot version updates
+        run: |
+          echo "🎮 Checking for latest Godot stable release..."
+          LATEST_GODOT=$(curl -s https://api.github.com/repos/godotengine/godot/releases/latest | jq -r .tag_name)
+          CURRENT_GODOT="4.3"
+          
+          echo "Current Godot version: $CURRENT_GODOT"
+          echo "Latest Godot version: $LATEST_GODOT"
+          
+          if [ "$LATEST_GODOT" != "$CURRENT_GODOT" ]; then
+            echo "::notice::New Godot version available: $LATEST_GODOT"
+            
+            # Create an issue for manual update
+            cat > .github/ISSUE_TEMPLATE/godot-update.md << EOF
+          ---
+          title: "Update Godot to $LATEST_GODOT"
+          labels: ["maintenance", "dependencies"]
+          assignees: []
+          ---
+
+          ## Godot Version Update Available
+
+          A new version of Godot is available:
+          - **Current**: $CURRENT_GODOT
+          - **Latest**: $LATEST_GODOT
+
+          ### Tasks
+          - [ ] Update Godot version in workflows
+          - [ ] Test build system with new version
+          - [ ] Update documentation if needed
+          - [ ] Verify all export templates work
+          EOF
+          fi
+
+  validate-projects:
+    name: ✅ Validate Projects
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'validate-projects' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate project structure
+        run: |
+          echo "🔍 Validating Godot project structure..."
+          
+          python -c "
+          from pathlib import Path
+          import json
+          
+          issues = []
+          projects = list(Path('godot-demo-projects').rglob('project.godot'))
+          
+          print(f'Found {len(projects)} Godot projects')
+          
+          for project_file in projects:
+              project_dir = project_file.parent
+              project_name = project_dir.name
+              
+              # Check for README
+              readme_file = project_dir / 'README.md'
+              if not readme_file.exists():
+                  issues.append(f'Missing README.md: {project_dir}')
+              
+              # Check for export directory
+              export_dir = project_dir / 'exports'
+              if export_dir.exists() and not any(export_dir.iterdir()):
+                  issues.append(f'Empty exports directory: {project_dir}')
+          
+          if issues:
+              print(f'\\n⚠️  Found {len(issues)} issues:')
+              for issue in issues[:10]:  # Show first 10 issues
+                  print(f'  - {issue}')
+              if len(issues) > 10:
+                  print(f'  ... and {len(issues) - 10} more')
+          else:
+              print('✅ All projects are properly structured')
+          
+          # Save issues for potential auto-fixing
+          with open('project_validation_issues.json', 'w') as f:
+              json.dump(issues, f, indent=2)
+          "
+
+      - name: Check for broken exports
+        run: |
+          echo "🔍 Checking for broken exports..."
+          
+          find godot-demo-projects -name "index.html" -path "*/exports/*" | while read html_file; do
+            wasm_file="${html_file%.html}.wasm"
+            if [ ! -f "$wasm_file" ]; then
+              echo "❌ Missing WASM for: $html_file"
+            fi
+          done
+
+      - name: Upload validation report
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-report
+          path: project_validation_issues.json
+          retention-days: 30
+
+  security-audit:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+    if: github.event.inputs.task == 'security-audit' || github.event.inputs.task == 'all' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+
+      - name: Check Python dependencies for vulnerabilities
+        run: |
+          echo "🔍 Checking Python dependencies for known vulnerabilities..."
+          safety check --file requirements.txt --json > safety_report.json || true
+          
+          if [ -s safety_report.json ]; then
+            echo "⚠️ Vulnerabilities found in dependencies"
+            cat safety_report.json
+          else
+            echo "✅ No known vulnerabilities in dependencies"
+          fi
+
+      - name: Run security linting
+        run: |
+          echo "🔍 Running security linting with bandit..."
+          bandit -r build_system/ -f json -o bandit_report.json || true
+          
+          if [ -s bandit_report.json ]; then
+            echo "⚠️ Security issues found in code"
+            cat bandit_report.json
+          else
+            echo "✅ No security issues found in code"
+          fi
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            safety_report.json
+            bandit_report.json
+          retention-days: 30
+
+  maintenance-summary:
+    name: 📊 Maintenance Summary
+    runs-on: ubuntu-latest
+    needs: [cleanup-cache, update-dependencies, validate-projects, security-audit]
+    if: always()
+    steps:
+      - name: Generate maintenance summary
+        run: |
+          echo "## 🧹 Maintenance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Cache Cleanup | ${{ needs.cleanup-cache.result }} | Old cache entries removed |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Updates | ${{ needs.update-dependencies.result }} | Checked for updates |" >> $GITHUB_STEP_SUMMARY
+          echo "| Project Validation | ${{ needs.validate-projects.result }} | Validated project structure |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Audit | ${{ needs.security-audit.result }} | Scanned for vulnerabilities |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "🕒 **Scheduled maintenance completed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔧 **Manual maintenance completed**" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📁 Check the [Actions artifacts](https://github.com/${{ github.repository }}/actions) for detailed reports." >> $GITHUB_STEP_SUMMARY

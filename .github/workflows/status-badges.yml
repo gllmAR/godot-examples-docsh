@@ -1,0 +1,87 @@
+name: 📊 Status Badges
+
+on:
+  workflow_run:
+    workflows: ["🎮 Build Godot Examples Documentation"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  update-badges:
+    name: 📊 Update Status Badges
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate status information
+        run: |
+          # Get workflow status
+          WORKFLOW_STATUS="${{ github.event.workflow_run.conclusion || 'unknown' }}"
+          
+          # Count projects and exports
+          PROJECT_COUNT=$(find godot-demo-projects -name "project.godot" 2>/dev/null | wc -l || echo "0")
+          EXPORT_COUNT=$(find godot-demo-projects -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
+          
+          echo "WORKFLOW_STATUS=$WORKFLOW_STATUS" >> $GITHUB_ENV
+          echo "PROJECT_COUNT=$PROJECT_COUNT" >> $GITHUB_ENV
+          echo "EXPORT_COUNT=$EXPORT_COUNT" >> $GITHUB_ENV
+          
+          echo "Workflow Status: $WORKFLOW_STATUS"
+          echo "Total Projects: $PROJECT_COUNT"
+          echo "Exported Projects: $EXPORT_COUNT"
+
+      - name: Create status badges
+        run: |
+          mkdir -p .github/badges
+          
+          # Build status badge
+          case "$WORKFLOW_STATUS" in
+            "success")
+              BUILD_COLOR="brightgreen"
+              BUILD_MESSAGE="passing"
+              ;;
+            "failure")
+              BUILD_COLOR="red"
+              BUILD_MESSAGE="failing"
+              ;;
+            *)
+              BUILD_COLOR="yellow"
+              BUILD_MESSAGE="unknown"
+              ;;
+          esac
+          
+          # Generate badge URLs
+          echo "BUILD_BADGE=https://img.shields.io/badge/build-$BUILD_MESSAGE-$BUILD_COLOR" >> $GITHUB_ENV
+          echo "PROJECTS_BADGE=https://img.shields.io/badge/projects-$PROJECT_COUNT-blue" >> $GITHUB_ENV
+          echo "EXPORTS_BADGE=https://img.shields.io/badge/exports-$EXPORT_COUNT-green" >> $GITHUB_ENV
+          echo "GODOT_BADGE=https://img.shields.io/badge/godot-4.3-blue" >> $GITHUB_ENV
+
+      - name: Update README with badges
+        run: |
+          # Create badges section for README
+          cat > .github/badges/README_badges.md << EOF
+          <!-- Status Badges - Auto-generated -->
+          ![Build Status]($BUILD_BADGE)
+          ![Projects]($PROJECTS_BADGE)
+          ![Exports]($EXPORTS_BADGE)
+          ![Godot Version]($GODOT_BADGE)
+          EOF
+          
+          echo "Badges updated in .github/badges/README_badges.md"
+
+      - name: Commit badge updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .github/badges/
+            git commit -m "Update status badges [skip ci]"
+            git push
+          else
+            echo "No changes to commit"
+          fi

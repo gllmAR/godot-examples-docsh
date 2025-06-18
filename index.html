@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, minimum-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
+
+    <!-- Replace with your own title and description. -->
+    <title>Docsify-godot-embed plugin</title>
+    <meta name="description" content="Embed Godot games and demos in Docsify documentation.">
+
+    <!-- Core Theme (see https://docsify.js.org/#/themes) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@^5.0.0-rc/dist/themes/core.min.css">
+
+    <!-- Core Dark - Dark Mode Only (add-on), to disable remove or comment out the below line -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@^5.0.0-rc/dist/themes/addons/core-dark.min.css"
+        media="(prefers-color-scheme: dark)" />
+
+    <link rel="stylesheet" href="https://gllmar.github.io/docsify-lightbox-v5/docsify-lightbox.css">
+    
+    <!-- Enhanced demo styles for resolution awareness and fullscreen -->
+    <link rel="stylesheet" href="https://gllmar.github.io/docsify-godot-embed/docsify-embed-godot.css">
+    
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <script>
+        // Docsify Configuration (see https://docsify.js.org/#/configuration)
+        window.$docsify = {
+            name: 'Godot+Docsify',
+            repo: 'https://github.com/gllmAR/docsify-examples-docsh',
+            homepage: 'README.md',
+
+            // Sidebar Configuration
+            auto2top: true,
+            loadSidebar: true,
+            maxLevel: 3,
+            // Set subMaxLevel to show nested navigation
+            subMaxLevel: 3,
+
+            // Search Plugin Configuration - temporarily disabled for debugging
+            search: {
+                placeholder: '    🔍',
+                noData: '     🤷‍♂️',
+                // Headline depth, 1 - 6
+                depth: 3,
+                hideOtherSidebarContent: false,
+            },
+            
+            // Navigation
+            relativePath: true,
+            
+            // Better navigation for tutorials
+            alias: {
+                '/.*/_sidebar.md': '/_sidebar.md',
+                '/.*/_navbar.md': '/_navbar.md',
+            },
+
+            // Copy Code Plugin Configuration    
+            copyCode: {
+                buttonText: '📝',
+                errorText: '⚠️',
+                successText: '✅ ',
+            },
+            
+            // Pagination for tutorial flow
+            pagination: {
+                previousText: '',
+                nextText: '',
+                crossChapter: true,
+                crossChapterText: true,
+            },
+            
+            // File extensions that should open in new tab
+            unhashtagLinkExtensions: ['.pdf', '.html', '.docx', '.gdscript'],
+        };
+    </script>
+
+    <!-- Required -->
+    <script src="https://cdn.jsdelivr.net/npm/docsify@^5.0.0-rc/dist/docsify.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/docsify@^5.0.0-rc/dist/plugins/search.min.js"></script>
+
+    <!-- Testing -->
+         <!-- Import Mermaid -->
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: "neutral"
+        });
+        window.mermaid = mermaid;
+    </script>
+
+        <!-- Lightbox plugin script -->
+    <script src="https://gllmar.github.io/docsify-lightbox-v5/docsify-lightbox.js"></script>
+    
+    <script src="https://gllmar.github.io/docsify-img-grid/docsify-img-grid.js"></script>
+    <script src="https://gllmar.github.io/docsify-img-caption/docsify-img-caption.js"></script>
+
+
+
+    <script src="//unpkg.com/docsify-pagination/dist/docsify-pagination.min.js"></script>
+    <!-- Video player plugin disabled - causing excessive console spam -->
+    <!-- <script src="https://gllmar.github.io/docsify-videoplayer/docsify-videoplayer.js"></script> -->
+    <script src="https://gllmar.github.io/docsify-repo-toolbar/docsify-repo-toolbar.js"></script>
+    <script src="https://gllmar.github.io/docsify-unhashtaglink/docsify-unhashtaglink.js"></script>
+    <!-- sidebar collapse break images -->
+    <!-- <script src="//cdn.jsdelivr.net/npm/docsify-sidebar-collapse/dist/docsify-sidebar-collapse.min.js"></script> -->
+    <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
+    <script src="//unpkg.com/docsify-mermaid@2.0.1/dist/docsify-mermaid.js"></script>
+    <script src="https://gllmar.github.io/docsify-v5-sidebar-collapse/docsify-v5-sidebar-collapse.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docsify@5.0.0-rc.1/dist/plugins/front-matter.js"></script>
+    <!-- Demo iframe initialization plugin -->
+    <script src="https://gllmar.github.io/docsify-godot-embed/docsify-embed-godot.js"></script>
+
+</body>
+
+</html>

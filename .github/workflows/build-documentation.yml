@@ -1,0 +1,453 @@
+name: 🎮 Build Godot Examples Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild all projects'
+        required: false
+        default: false
+        type: boolean
+      target_subset:
+        description: 'Build subset (all, 2d, 3d, gui, audio, misc)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - 2d
+          - 3d
+          - gui
+          - audio
+          - misc
+
+env:
+  GODOT_VERSION: "4.4.1"
+  GODOT_VERSION_STABLE: "4.4.1-stable"
+  GODOT_TEMPLATE_VERSION: "4.4.1.stable"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  detect-changes:
+    name: 🔍 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      build-needed: ${{ steps.changes.outputs.build-needed }}
+      projects-changed: ${{ steps.changes.outputs.projects-changed }}
+      docs-changed: ${{ steps.changes.outputs.docs-changed }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          submodules: true
+
+      - name: Initialize and update submodules
+        run: |
+          echo "📦 Ensuring submodules are properly initialized..."
+          git submodule update --init --recursive --depth 1
+
+      - name: Detect changes
+        id: changes
+        run: |
+          # Check if build system or projects changed
+          if git diff --name-only HEAD~1 | grep -E "(build_system/|godot-demo-projects/|\.py$|\.sh$)" || [ "${{ github.event.inputs.force_rebuild }}" == "true" ]; then
+            echo "build-needed=true" >> $GITHUB_OUTPUT
+          else
+            echo "build-needed=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check if projects changed
+          if git diff --name-only HEAD~1 | grep "godot-demo-projects/"; then
+            echo "projects-changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "projects-changed=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check if docs changed
+          if git diff --name-only HEAD~1 | grep -E "(README|\.md$|docs/)"; then
+            echo "docs-changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "docs-changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-projects:
+    name: 🏗️ Build Godot Projects
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build-needed == 'true'
+    strategy:
+      matrix:
+        subset: ['2d', '3d', 'gui', 'audio', 'misc']
+        include:
+          - subset: '2d'
+            pattern: 'godot-demo-projects/2d/*'
+          - subset: '3d'
+            pattern: 'godot-demo-projects/3d/*'
+          - subset: 'gui'
+            pattern: 'godot-demo-projects/gui/*'
+          - subset: 'audio'
+            pattern: 'godot-demo-projects/audio/*'
+          - subset: 'misc'
+            pattern: 'godot-demo-projects/{compute,loading,misc,mobile,networking,plugins,viewport,xr}/*'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: true
+
+      - name: Clean any existing export artifacts
+        run: |
+          echo "🧹 Cleaning existing export artifacts from submodules..."
+          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
+          find godot-demo-projects -name "*.wasm" -delete 2>/dev/null || true
+          find godot-demo-projects -name "*.pck" -delete 2>/dev/null || true
+          echo "Cleaned export artifacts to ensure fresh build"
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Setup Godot
+        run: |
+          echo "🎮 Setting up Godot Engine ${GODOT_VERSION}..."
+          
+          # Download Godot for Linux
+          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
+          TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_export_templates.tpz"
+          
+          echo "📥 Downloading Godot ${GODOT_VERSION}..."
+          wget -q "${GODOT_URL}" -O godot.zip
+          
+          echo "📦 Extracting Godot..."
+          unzip -q godot.zip
+          
+          # Make Godot executable and move to a standard location
+          chmod +x Godot_v${GODOT_VERSION_STABLE}_linux.x86_64
+          sudo mv Godot_v${GODOT_VERSION_STABLE}_linux.x86_64 /usr/local/bin/godot
+          
+          echo "📥 Downloading export templates..."
+          wget -q "${TEMPLATES_URL}" -O export_templates.tpz
+          
+          echo "📦 Installing export templates..."
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
+          unzip -q export_templates.tpz -d ~/.local/share/godot/export_templates/
+          mv ~/.local/share/godot/export_templates/templates/* ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+          rmdir ~/.local/share/godot/export_templates/templates
+          
+          echo "✅ Godot setup completed"
+          godot --version
+          
+          echo "🔍 Verifying export templates..."
+          ls -la ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+          
+          echo "🧹 Cleaning up downloaded files..."
+          rm -f godot.zip export_templates.tpz
+          echo "✅ Cleanup completed"
+
+      - name: Verify Godot installation
+        run: |
+          echo "🔍 Verifying Godot installation..."
+          godot --version
+          
+          echo "🔍 Checking export presets..."
+          godot --headless --list-export-presets --quit
+          
+          echo "🔍 Verifying export templates are installed..."
+          if [ -d ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION} ]; then
+            echo "✅ Export templates found for version ${GODOT_TEMPLATE_VERSION}"
+            ls -la ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+          else
+            echo "❌ Export templates not found!"
+            exit 1
+          fi
+
+      - name: Cache build artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            .build_cache
+            build_system/cache
+          key: ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-${{ matrix.subset }}-${{ hashFiles('godot-demo-projects/**/*.godot') }}
+          restore-keys: |
+            ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-${{ matrix.subset }}-
+            ${{ runner.os }}-godot-${{ env.GODOT_VERSION }}-
+
+      - name: Build projects subset
+        run: |
+          # Set target subset if specified
+          TARGET_SUBSET="${{ github.event.inputs.target_subset || 'all' }}"
+          if [ "$TARGET_SUBSET" != "all" ] && [ "$TARGET_SUBSET" != "${{ matrix.subset }}" ]; then
+            echo "Skipping ${{ matrix.subset }} as target is $TARGET_SUBSET"
+            exit 0
+          fi
+          
+          # Build projects for this subset
+          python build_system/scons_build.py \
+            --projects-dir godot-demo-projects \
+            --godot-binary godot \
+            --godot-version ${{ env.GODOT_VERSION }} \
+            --jobs 2 \
+            --cache-dir .build_cache \
+            ${{ github.event.inputs.force_rebuild == 'true' && '--force-rebuild' || '' }} \
+            --verbose
+        env:
+          SUBSET_PATTERN: ${{ matrix.pattern }}
+
+      - name: Run embed injection
+        run: |
+          echo "🔗 Running embed injection for built projects..."
+          # Use the new command-line interface
+          python build_system/builders/embed_injector.py \
+            --projects-dir godot-demo-projects \
+            --output-dir docs/generated \
+            --verbose
+        continue-on-error: true
+
+      - name: Check build results
+        run: |
+          echo "🎯 Build Results for ${{ matrix.subset }}:"
+          find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l | xargs -I {} echo "  Built {} WASM files"
+          find godot-demo-projects -name "index.html" -path "*/exports/*" | wc -l | xargs -I {} echo "  Created {} web exports"
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: godot-exports-${{ matrix.subset }}
+          path: |
+            godot-demo-projects/*/exports/
+            !godot-demo-projects/*/exports/**/*.tmp
+            !godot-demo-projects/*/exports/**/*.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Clean exports after archiving
+        run: |
+          echo "🧹 Cleaning exports after archiving to prevent git issues..."
+          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Archive build logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-logs-${{ matrix.subset }}
+          path: |
+            .build_cache/build_cache.json
+            build_system/logs/
+          retention-days: 3
+
+  build-documentation:
+    name: 📚 Build Documentation Site
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-projects]
+    if: always() && (needs.detect-changes.outputs.build-needed == 'true' || needs.detect-changes.outputs.docs-changed == 'true')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download build artifacts
+        if: needs.build-projects.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: godot-exports-*
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Restore build artifacts
+        if: needs.build-projects.result == 'success'
+        run: |
+          # Merge all subset artifacts back into the main structure
+          for subset_dir in artifacts/godot-exports-*/; do
+            if [ -d "$subset_dir" ]; then
+              echo "Restoring artifacts from $subset_dir"
+              cp -r "$subset_dir"/* ./ 2>/dev/null || true
+            fi
+          done
+
+      - name: Generate documentation
+        run: |
+          echo "📚 Generating documentation site..."
+          
+          # Run documentation generation
+          python build_system/builders/docs_generator.py
+          
+          # Inject embeds
+          python build_system/builders/embed_injector.py
+          
+          # Generate navigation
+          python -c "
+          from pathlib import Path
+          import json
+          
+          # Generate sidebar navigation
+          projects = list(Path('godot-demo-projects').rglob('project.godot'))
+          sidebar = []
+          
+          categories = {}
+          for project_file in projects:
+              project_dir = project_file.parent
+              category = project_dir.parts[1] if len(project_dir.parts) > 1 else 'misc'
+              project_name = project_dir.name
+              
+              if category not in categories:
+                  categories[category] = []
+              
+              categories[category].append({
+                  'name': project_name.replace('_', ' ').title(),
+                  'path': str(project_dir).replace('godot-demo-projects/', ''),
+                  'has_export': (project_dir / 'exports' / 'web' / 'index.html').exists()
+              })
+          
+          # Write sidebar
+          with open('_sidebar.md', 'w') as f:
+              f.write('# Godot Examples\\n\\n')
+              for category, projects in sorted(categories.items()):
+                  f.write(f'## {category.upper()}\\n\\n')
+                  for project in sorted(projects, key=lambda x: x['name']):
+                      icon = '🎮' if project['has_export'] else '📁'
+                      f.write(f'- [{icon} {project[\"name\"]}]({project[\"path\"]}/README.md)\\n')
+                  f.write('\\n')
+          
+          print(f'Generated sidebar with {len(projects)} projects')
+          "
+
+      - name: Verify documentation structure
+        run: |
+          echo "📊 Documentation Statistics:"
+          echo "  Total projects: $(find godot-demo-projects -name project.godot | wc -l)"
+          echo "  With exports: $(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)"
+          echo "  README files: $(find godot-demo-projects -name README.md | wc -l)"
+          echo "  Sidebar entries: $(grep -c '🎮\|📁' _sidebar.md)"
+
+      - name: Build site with docsify
+        run: |
+          echo "🌐 Building static documentation site..."
+          
+          # Install docsify-cli if needed for static generation
+          npm install -g docsify-cli
+          
+          # Verify index.html exists
+          if [ ! -f "index.html" ]; then
+            echo "Creating index.html for docsify"
+            cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Godot Examples Documentation</title>
+            <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+            <meta name="description" content="Interactive documentation for Godot Engine demo projects">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+            <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css">
+          </head>
+          <body>
+            <div id="app"></div>
+            <script>
+              window.$docsify = {
+                name: 'Godot Examples',
+                repo: 'https://github.com/godotengine/godot-demo-projects',
+                loadSidebar: true,
+                subMaxLevel: 2,
+                search: 'auto',
+                copyCode: {
+                  buttonText : 'Copy to clipboard',
+                  errorText  : 'Error',
+                  successText: 'Copied'
+                }
+              }
+            </script>
+            <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+            <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+            <script src="//cdn.jsdelivr.net/npm/docsify-copy-code@2"></script>
+          </body>
+          </html>
+          EOF
+          fi
+
+      - name: Archive documentation site
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation-site
+          path: |
+            index.html
+            _sidebar.md
+            README.md
+            DOCS.md
+            godot-demo-projects/
+            !godot-demo-projects/**/.git
+            !godot-demo-projects/**/*.tmp
+          retention-days: 30
+
+  deploy:
+    name: 🚀 Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build-projects, build-documentation]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+
+      - name: Download documentation site
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation-site
+          path: ./site
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: ./site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+
+  notify:
+    name: 📢 Notify Results
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-projects, build-documentation, deploy]
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## 🎮 Godot Examples Documentation Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detect Changes | ${{ needs.detect-changes.result }} | Build needed: ${{ needs.detect-changes.outputs.build-needed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Projects | ${{ needs.build-projects.result }} | Projects: ${{ needs.build-projects.result == 'success' && '✅ Built successfully' || '❌ Build failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Documentation | ${{ needs.build-documentation.result }} | Docs: ${{ needs.build-documentation.result == 'success' && '✅ Generated successfully' || '❌ Generation failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} | Pages: ${{ needs.deploy.result == 'success' && '🚀 Deployed successfully' || needs.deploy.result == 'skipped' && '⏭️ Skipped' || '❌ Deploy failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "🌐 **Documentation is live!** Check the [GitHub Pages deployment](https://github.com/${{ github.repository }}/deployments)" >> $GITHUB_STEP_SUMMARY
+          fi

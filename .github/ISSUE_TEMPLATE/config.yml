@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://gllmar.github.io/godot-examples-docsh/
+    about: View the live documentation and examples
+  - name: 💬 Discussions
+    url: https://github.com/gllmar/godot-examples-docsh/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🎮 Godot Demo Projects
+    url: https://github.com/godotengine/godot-demo-projects
+    about: Report issues with specific Godot demo projects upstream
