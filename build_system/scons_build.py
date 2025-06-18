@@ -305,8 +305,17 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         # Create export preset
         self._create_export_preset(target.project_path)
         
-        # Ensure export directory exists
-        target.export_path.parent.mkdir(parents=True, exist_ok=True)
+        # Ensure export directory exists (use absolute path)
+        try:
+            export_dir = target.project_path / target.export_path.parent
+            export_dir.mkdir(parents=True, exist_ok=True)
+            print(f"📁 Created export directory: {export_dir}")
+            print(f"📄 Export target: {target.project_path / target.export_path}")
+            print(f"🏠 Working directory: {os.getcwd()}")
+            print(f"📦 Project path: {target.project_path}")
+        except Exception as e:
+            print(f"❌ Failed to create export directory: {e}")
+            return BuildResult(target, False, time.time() - start_time, f"Directory creation failed: {e}")
         
         # Run Godot export
         cmd = [
@@ -316,6 +325,9 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
             target.preset_name,
             str(target.export_path)
         ]
+        
+        print(f"🚀 Running command: {' '.join(cmd)}")
+        print(f"📂 In directory: {target.project_path}")
         
         try:
             result = subprocess.run(
