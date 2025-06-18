@@ -89,8 +89,21 @@ def embed_injector_builder(target, source, env):
 def generate_embed_html(game_file: Path, width: str, height: str, env) -> str:
     """Generate HTML embed code for a Godot game"""
     
-    # Get relative path from docs to game
-    game_url = f"../build/{game_file.parent.name}/{game_file.name}"
+    # Get relative path from docs to game exports
+    # For GitHub Pages, we need the path relative to the site root
+    # game_file is like: /path/to/godot-demo-projects/2d/bullet_shower/exports/web/index.html
+    # We want: godot-demo-projects/2d/bullet_shower/exports/web/index.html
+    
+    # Extract the project path from the game_file
+    parts = game_file.parts
+    try:
+        # Find the godot-demo-projects part
+        godot_idx = parts.index('godot-demo-projects')
+        # Build path from godot-demo-projects onwards
+        game_url = '/'.join(parts[godot_idx:])
+    except ValueError:
+        # Fallback to relative path
+        game_url = f"../exports/{game_file.parent.name}/{game_file.name}"
     
     # Generate responsive embed HTML
     embed_html = f"""
@@ -307,6 +320,8 @@ def main():
                        help='Directory containing Godot projects')
     parser.add_argument('--output-dir', default='docs/generated',
                        help='Output directory for processed documentation')
+    parser.add_argument('--in-place', action='store_true',
+                       help='Update README.md files in place instead of creating new files')
     parser.add_argument('--subset', 
                        help='Only process projects matching this subset pattern')
     parser.add_argument('--width', default='800',
@@ -372,6 +387,9 @@ def main():
             if embed_marker in readme_content:
                 # Replace existing embed marker with actual embed
                 updated_content = readme_content.replace(embed_marker, embed_html)
+            elif '<!-- embed-{$PATH}' in readme_content:
+                # Replace $PATH placeholder with actual embed
+                updated_content = readme_content.replace('<!-- embed-{$PATH} -->', embed_html)
             elif '<!-- embed-{' in readme_content:
                 # Replace any existing embed marker with actual embed
                 import re
@@ -398,8 +416,13 @@ def main():
                 lines.insert(insert_idx, f"\n{embed_marker}\n")
                 updated_content = '\n'.join(lines)
             
-            # Write to output directory
-            output_file = output_dir / f"{project_name}_README.md"
+            # Write to output directory or update in place
+            if args.in_place:
+                # Update the original README file
+                output_file = readme_path
+            else:
+                # Write to output directory
+                output_file = output_dir / f"{project_name}_README.md"
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(updated_content)
             

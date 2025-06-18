@@ -605,6 +605,7 @@ def main():
                 result = subprocess.run([
                     sys.executable, str(embed_script),
                     '--projects-dir', args.projects_dir,
+                    '--in-place',
                     '--verbose' if args.verbose else '--quiet'
                 ], capture_output=not args.verbose)
                 
@@ -633,6 +634,7 @@ def main():
                     result = subprocess.run([
                         sys.executable, str(embed_script),
                         '--projects-dir', args.projects_dir,
+                        '--in-place',
                         '--verbose' if args.verbose else '--quiet'
                     ], capture_output=not args.verbose)
                     
