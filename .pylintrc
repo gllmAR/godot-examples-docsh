@@ -1,0 +1,17 @@
+[MESSAGES CONTROL]
+# Disable warnings for SCons-specific modules that Pylance can't resolve
+disable=
+    import-error,
+    undefined-variable
+
+[IMPORTS]
+# Allow SCons imports which are dynamically available
+ignored-modules=SCons,SCons.Builder,SCons.Script
+
+[BASIC]
+# SCons files don't follow typical Python naming conventions
+good-names=env,Environment,AddOption,GetOption,SetOption,CacheDir,Default,Exit,Mkdir,ARGUMENTS
+
+[DESIGN]
+# SCons scripts often have many statements at module level
+max-statements=50
