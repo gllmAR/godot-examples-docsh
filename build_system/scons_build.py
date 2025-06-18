@@ -198,8 +198,9 @@ class BuildEnvironment:
         if self.options['force_rebuild']:
             return True
         
-        # Check if target exists
-        if not target.export_path.exists():
+        # Check if target exists (use absolute path)
+        absolute_export_path = target.project_path / target.export_path
+        if not absolute_export_path.exists():
             return True
         
         target_key = str(target.project_path)
@@ -340,9 +341,10 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
             
             duration = time.time() - start_time
             
-            # Check if export was successful
-            wasm_path = target.export_path.with_suffix('.wasm')
-            success = target.export_path.exists() and wasm_path.exists()
+            # Check if export was successful (use absolute paths)
+            absolute_export_path = target.project_path / target.export_path
+            wasm_path = absolute_export_path.with_suffix('.wasm')
+            success = absolute_export_path.exists() and wasm_path.exists()
             
             file_size = None
             if success and wasm_path.exists():
@@ -380,8 +382,8 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         """Add a build target (SCons-like interface)"""
         project_path_obj = Path(project_path)
         
-        # Default export path
-        export_path = project_path_obj / "exports" / "web" / "index.html"
+        # Default export path (relative to project directory)
+        export_path = Path("exports") / "web" / "index.html"
         if 'export_path' in kwargs:
             export_path = Path(kwargs['export_path'])
         
