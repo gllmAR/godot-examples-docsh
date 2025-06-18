@@ -189,10 +189,16 @@ jobs:
             ${{ github.event.inputs.force_rebuild == 'true' && '--force-rebuild' || '' }} \
             --verbose
 
-      - name: Run embed injection
+      - name: Add embed markers and inject embeds
         run: |
-          echo "🔗 Running embed injection for built projects..."
-          # Use the new command-line interface
+          echo "🔗 Adding embed markers to README files..."
+          # First add markers to README files
+          python build_system/builders/embed_injector.py add-markers \
+            --projects-dir godot-demo-projects \
+            --verbose
+          
+          echo "🎮 Injecting embeds into README files..."
+          # Then inject actual embeds
           python build_system/builders/embed_injector.py \
             --projects-dir godot-demo-projects \
             --output-dir docs/generated \
