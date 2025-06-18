@@ -541,6 +541,10 @@ def main():
                         help='Add embed markers to README files after building')
     parser.add_argument('--inject-embeds', action='store_true',
                         help='Inject actual embeds into README files (replaces markers)')
+    parser.add_argument('--generate-docs', action='store_true',
+                        help='Generate documentation sidebar and embed processing')
+    parser.add_argument('--docs-output', default='_sidebar.md',
+                        help='Output file for generated sidebar (default: _sidebar.md)')
     parser.add_argument('--continue-on-error', action='store_true',
                         help='Continue and create website even if some projects fail to build')
     
@@ -561,14 +565,30 @@ def main():
         targets = env.ScanForProjects(args.projects_dir)
         success = env.Build(targets)
         
-        # Post-build embed processing
-        if success and (args.add_embed_markers or args.inject_embeds):
+        # Post-build processing
+        if success and (args.add_embed_markers or args.inject_embeds or args.generate_docs):
             from pathlib import Path
             import subprocess
             
-            embed_script = Path(__file__).parent / 'builders' / 'embed_injector.py'
-            
-            if args.add_embed_markers:
+            # Generate documentation sidebar if requested
+            if args.generate_docs:
+                print(f"{Colors.BLUE}📚 Generating documentation sidebar...{Colors.NC}")
+                sidebar_script = Path(__file__).parent / 'builders' / 'sidebar_generator.py'
+                result = subprocess.run([
+                    sys.executable, str(sidebar_script),
+                    '--projects-dir', args.projects_dir,
+                    '--output', args.docs_output,
+                    '--verbose' if args.verbose else '--quiet'
+                ], capture_output=not args.verbose)
+                
+                if result.returncode == 0:
+                    print(f"{Colors.GREEN}✅ Documentation sidebar generated: {args.docs_output}{Colors.NC}")
+                else:
+                    print(f"{Colors.YELLOW}⚠️  Documentation generation completed with warnings{Colors.NC}")
+                
+                # When generating docs, also add embed markers and inject embeds
+                embed_script = Path(__file__).parent / 'builders' / 'embed_injector.py'
+                
                 print(f"{Colors.BLUE}🔗 Adding embed markers to README files...{Colors.NC}")
                 result = subprocess.run([
                     sys.executable, str(embed_script), 'add-markers',
@@ -576,10 +596,11 @@ def main():
                     '--verbose' if args.verbose else '--quiet'
                 ], capture_output=not args.verbose)
                 
-                if result.returncode != 0:
+                if result.returncode == 0:
+                    print(f"{Colors.GREEN}✅ Embed markers added{Colors.NC}")
+                else:
                     print(f"{Colors.YELLOW}⚠️  Embed marker addition completed with warnings{Colors.NC}")
-            
-            if args.inject_embeds:
+                
                 print(f"{Colors.BLUE}🎮 Injecting embeds into README files...{Colors.NC}")
                 result = subprocess.run([
                     sys.executable, str(embed_script),
@@ -587,8 +608,36 @@ def main():
                     '--verbose' if args.verbose else '--quiet'
                 ], capture_output=not args.verbose)
                 
-                if result.returncode != 0:
+                if result.returncode == 0:
+                    print(f"{Colors.GREEN}✅ Embeds injected successfully{Colors.NC}")
+                else:
                     print(f"{Colors.YELLOW}⚠️  Embed injection completed with warnings{Colors.NC}")
+            
+            # Separate embed processing (when not part of docs generation)
+            if not args.generate_docs:
+                embed_script = Path(__file__).parent / 'builders' / 'embed_injector.py'
+                
+                if args.add_embed_markers:
+                    print(f"{Colors.BLUE}🔗 Adding embed markers to README files...{Colors.NC}")
+                    result = subprocess.run([
+                        sys.executable, str(embed_script), 'add-markers',
+                        '--projects-dir', args.projects_dir,
+                        '--verbose' if args.verbose else '--quiet'
+                    ], capture_output=not args.verbose)
+                    
+                    if result.returncode != 0:
+                        print(f"{Colors.YELLOW}⚠️  Embed marker addition completed with warnings{Colors.NC}")
+                
+                if args.inject_embeds:
+                    print(f"{Colors.BLUE}🎮 Injecting embeds into README files...{Colors.NC}")
+                    result = subprocess.run([
+                        sys.executable, str(embed_script),
+                        '--projects-dir', args.projects_dir,
+                        '--verbose' if args.verbose else '--quiet'
+                    ], capture_output=not args.verbose)
+                    
+                    if result.returncode != 0:
+                        print(f"{Colors.YELLOW}⚠️  Embed injection completed with warnings{Colors.NC}")
         
         # Exit with appropriate code
         if args.continue_on_error:

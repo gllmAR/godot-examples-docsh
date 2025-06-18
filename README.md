@@ -142,14 +142,16 @@ python build_system/scons_build.py --help  # Advanced options
 
 ## 📈 Migration Notes
 
-This project has been migrated from a bash-based build system to SCons for better performance and reliability. The old scripts are archived in `docsh/legacy_scripts/` for reference.
+This project has been migrated from the external `docsh` submodule to an integrated SCons-based build system for better performance and reliability. All documentation generation, sidebar creation, and embed injection are now handled by the main build system.
 
 **Key Improvements:**
 - 3-4x faster build times
-- Intelligent dependency tracking
-- Better error handling and reporting
+- Integrated documentation generation (no external dependencies)
+- Intelligent dependency tracking and caching
+- Better error handling and resilience
 - Cross-platform compatibility
 - Real-time progress monitoring
+- Unified workflow for building and documentation
 
 ## 🤝 Contributing
 

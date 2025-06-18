@@ -182,22 +182,19 @@ scons test_godot_export
 scons benchmark
 ```
 
-## 🚀 **Migration from Bash System**
+## 🚀 **Modern Build System**
 
-The SCons build system is designed to be a **drop-in replacement** for the existing bash scripts:
+The SCons-based build system provides a modern, reliable build experience:
 
 ```bash
-# Old way
-./docsh/build.sh --parallel --verbose
+# Build everything with documentation generation
+python build_system/scons_build.py --generate-docs --verbose
 
-# New way
-cd build_system && scons -j --verbose
+# Build with custom Godot version
+python build_system/scons_build.py --godot-version 4.4.1 --verbose
 
-# Old way
-./docsh/build.sh --clean --serve
-
-# New way  
-cd build_system && scons -c serve
+# Build with parallel jobs and error resilience
+python build_system/scons_build.py -j 4 --continue-on-error --generate-docs
 ```
 
 ## 📈 **Benefits**
