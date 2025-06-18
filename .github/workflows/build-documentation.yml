@@ -205,10 +205,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: godot-exports-all
-          path: |
-            godot-demo-projects/*/exports/
-            !godot-demo-projects/*/exports/**/*.tmp
-            !godot-demo-projects/*/exports/**/*.log
+          path: godot-demo-projects/
           retention-days: 7
           if-no-files-found: warn
 
@@ -250,7 +247,31 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: godot-exports-all
-          path: ./
+          path: ./built-projects
+
+      - name: Merge exports into documentation
+        if: needs.build-projects.result == 'success'
+        run: |
+          echo "🔄 Merging built exports into documentation structure..."
+          
+          # Copy exports from the built projects to the current godot-demo-projects
+          if [ -d "./built-projects/godot-demo-projects" ]; then
+            echo "📂 Found built projects, copying exports..."
+            # Use rsync to merge only the exports directories
+            rsync -av --include="*/" --include="exports/" --include="exports/**" --exclude="*" \
+              ./built-projects/godot-demo-projects/ ./godot-demo-projects/
+            
+            echo "✅ Exports merged successfully"
+            echo "📊 Export statistics after merge:"
+            echo "  Export folders: $(find godot-demo-projects -name exports -type d | wc -l)"
+            echo "  WASM files: $(find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l)"
+            echo "  Web exports: $(find godot-demo-projects -name index.html -path "*/exports/*" | wc -l)"
+          else
+            echo "⚠️  No built projects found in artifact"
+          fi
+          
+          # Clean up temporary directory
+          rm -rf ./built-projects
 
       - name: Process embeds for documentation
         run: |
@@ -280,8 +301,22 @@ jobs:
           echo "🔍 Verifying exports are present for deployment:"
           export_count=$(find godot-demo-projects -name "exports" -type d | wc -l)
           web_count=$(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)
+          wasm_count=$(find godot-demo-projects -name "*.wasm" -path '*/exports/*' | wc -l)
+          
           echo "  Export folders: $export_count"
-          echo "  Web exports: $web_count"
+          echo "  Web exports: $web_count" 
+          echo "  WASM files: $wasm_count"
+          
+          # Calculate approximate size
+          if [ "$wasm_count" -gt 0 ]; then
+            echo ""
+            echo "📦 Size estimation:"
+            sample_size=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" -exec du -b {} \; | head -5 | awk '{sum+=$1} END {print sum/NR}')
+            if [ -n "$sample_size" ]; then
+              total_mb=$((wasm_count * sample_size / 1024 / 1024))
+              echo "  Estimated total size: ${total_mb}MB (${wasm_count} WASM files)"
+            fi
+          fi
           
           if [ "$web_count" -gt 0 ]; then
             echo "  ✅ Web exports found - will be included in site"
@@ -289,6 +324,7 @@ jobs:
             find godot-demo-projects -name index.html -path '*/exports/*' | head -3 | sed 's|^|    /|'
           else
             echo "  ⚠️  No web exports found - games won't be playable"
+            exit 1
           fi
 
       - name: Build site with docsify
