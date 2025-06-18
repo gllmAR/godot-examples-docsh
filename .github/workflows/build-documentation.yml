@@ -223,7 +223,7 @@ jobs:
           find godot-demo-projects -name "index.html" -path "*/exports/*" | wc -l | xargs -I {} echo "  Created {} web exports"
 
       - name: Archive build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: godot-exports-${{ matrix.subset }}
           path: |
@@ -240,7 +240,7 @@ jobs:
 
       - name: Archive build logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ matrix.subset }}
           path: |
@@ -389,7 +389,7 @@ jobs:
           fi
 
       - name: Archive documentation site
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: documentation-site
           path: |
@@ -416,7 +416,7 @@ jobs:
         uses: actions/configure-pages@v3
 
       - name: Download documentation site
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: documentation-site
           path: ./site
