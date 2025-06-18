@@ -275,6 +275,21 @@ jobs:
           echo "  With exports: $(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)"
           echo "  README files: $(find godot-demo-projects -name README.md | wc -l)"
           echo "  Sidebar entries: $(grep -c '🎮\|📁' _sidebar.md)"
+          
+          echo ""
+          echo "🔍 Verifying exports are present for deployment:"
+          export_count=$(find godot-demo-projects -name "exports" -type d | wc -l)
+          web_count=$(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)
+          echo "  Export folders: $export_count"
+          echo "  Web exports: $web_count"
+          
+          if [ "$web_count" -gt 0 ]; then
+            echo "  ✅ Web exports found - will be included in site"
+            echo "  Sample export URLs that will be available:"
+            find godot-demo-projects -name index.html -path '*/exports/*' | head -3 | sed 's|^|    /|'
+          else
+            echo "  ⚠️  No web exports found - games won't be playable"
+          fi
 
       - name: Build site with docsify
         run: |
@@ -336,11 +351,6 @@ jobs:
             !godot-demo-projects/**/*.log
           retention-days: 30
 
-      - name: Clean exports for git safety
-        run: |
-          echo "🧹 Cleaning exports after documentation build..."
-          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
-
   deploy:
     name: 🚀 Deploy to GitHub Pages
     runs-on: ubuntu-latest
@@ -360,6 +370,23 @@ jobs:
         with:
           name: documentation-site
           path: ./site
+
+      - name: Verify deployment content
+        run: |
+          echo "🔍 Verifying content being deployed to GitHub Pages:"
+          echo "  Total files: $(find ./site -type f | wc -l)"
+          echo "  Export folders: $(find ./site -name exports -type d | wc -l)"
+          echo "  Web exports: $(find ./site -name index.html -path '*/exports/*' | wc -l)"
+          
+          if [ "$(find ./site -name exports -type d | wc -l)" -gt 0 ]; then
+            echo "  ✅ Export folders present in deployment"
+            echo "  Sample exports in deployment:"
+            find ./site -name index.html -path '*/exports/*' | head -3 | sed 's|^./site||'
+          else
+            echo "  ❌ No export folders found in deployment!"
+            echo "  Site structure:"
+            ls -la ./site/
+          fi
 
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
