@@ -254,20 +254,66 @@ jobs:
         run: |
           echo "🔄 Merging built exports into documentation structure..."
           
-          # Copy exports from the built projects to the current godot-demo-projects
+          # Debug: Check what's actually in the artifact
+          echo "🔍 Debug: Artifact root contents:"
+          ls -la ./built-projects/
+          echo ""
+          echo "🔍 Debug: Looking for export directories anywhere in artifact:"
+          find ./built-projects -type d -name "exports" | head -10
+          echo ""
+          echo "🔍 Debug: Looking for project structure:"
+          find ./built-projects -name "project.godot" | head -5
+          echo ""
+          
+          # Strategy 1: Check if we have the full godot-demo-projects structure
           if [ -d "./built-projects/godot-demo-projects" ]; then
-            echo "📂 Found built projects, copying exports..."
-            # Use rsync to merge only the exports directories
+            echo "📂 Strategy 1: Found nested godot-demo-projects structure"
             rsync -av --include="*/" --include="exports/" --include="exports/**" --exclude="*" \
               ./built-projects/godot-demo-projects/ ./godot-demo-projects/
+              
+          # Strategy 2: Check if the artifact IS the godot-demo-projects directory (direct upload)
+          elif find ./built-projects -name "project.godot" | head -1 | grep -q .; then
+            echo "📂 Strategy 2: Artifact contains project files directly"
+            rsync -av --include="*/" --include="exports/" --include="exports/**" --exclude="*" \
+              ./built-projects/ ./godot-demo-projects/
+              
+          # Strategy 3: Look for any exports directories and try to reconstruct
+          elif find ./built-projects -name "exports" -type d | head -1 | grep -q .; then
+            echo "📂 Strategy 3: Found exports directories, reconstructing structure"
+            find ./built-projects -name "exports" -type d | while read export_dir; do
+              echo "  Processing: $export_dir"
+              # Try to extract project path by looking at parent directories
+              project_path=$(echo "$export_dir" | sed 's|./built-projects/||' | sed 's|/exports||')
+              if [ -n "$project_path" ] && [ "$project_path" != "exports" ]; then
+                echo "    Copying to godot-demo-projects/$project_path/"
+                mkdir -p "./godot-demo-projects/$project_path"
+                cp -r "$export_dir" "./godot-demo-projects/$project_path/"
+              fi
+            done
             
-            echo "✅ Exports merged successfully"
-            echo "📊 Export statistics after merge:"
-            echo "  Export folders: $(find godot-demo-projects -name exports -type d | wc -l)"
-            echo "  WASM files: $(find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l)"
-            echo "  Web exports: $(find godot-demo-projects -name index.html -path "*/exports/*" | wc -l)"
           else
-            echo "⚠️  No built projects found in artifact"
+            echo "⚠️  No recognizable export structure found in artifact"
+            echo "🔍 Complete artifact structure (first 20 files):"
+            find ./built-projects -type f | head -20
+            echo "⚠️  Artifact size: $(du -sh ./built-projects)"
+          fi
+          
+          echo ""
+          echo "📊 Final export statistics after merge attempt:"
+          export_folders=$(find godot-demo-projects -name exports -type d | wc -l)
+          wasm_files=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l)
+          web_exports=$(find godot-demo-projects -name index.html -path "*/exports/*" | wc -l)
+          
+          echo "  Export folders: $export_folders"
+          echo "  WASM files: $wasm_files"
+          echo "  Web exports: $web_exports"
+          
+          if [ "$export_folders" -gt 0 ]; then
+            echo "  ✅ Exports successfully merged!"
+            echo "  Sample paths:"
+            find godot-demo-projects -name exports -type d | head -3 | sed 's|^|    |'
+          else
+            echo "  ❌ No exports found after merge - this will cause deployment failure"
           fi
           
           # Clean up temporary directory
