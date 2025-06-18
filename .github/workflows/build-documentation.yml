@@ -212,10 +212,7 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Clean exports after archiving
-        run: |
-          echo "🧹 Cleaning exports after archiving to prevent git issues..."
-          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
+      # Note: Do NOT clean exports here - they're needed for documentation build
 
       - name: Archive build logs
         if: always()
@@ -254,6 +251,22 @@ jobs:
         with:
           name: godot-exports-all
           path: ./
+
+      - name: Process embeds for documentation
+        run: |
+          echo "🎮 Ensuring embeds are properly processed for documentation site..."
+          
+          # Verify embed injection worked during build
+          echo "📊 Checking embed injection status:"
+          if grep -r "<!-- EMBED:" godot-demo-projects/*/README.md | head -5; then
+            echo "✅ Embeds found in README files"
+          else
+            echo "⚠️  No embeds found, running injection again..."
+            python build_system/scons_build.py \
+              --inject-embeds \
+              --projects-dir godot-demo-projects \
+              --verbose
+          fi
 
       - name: Verify documentation structure
         run: |
@@ -320,7 +333,13 @@ jobs:
             godot-demo-projects/
             !godot-demo-projects/**/.git
             !godot-demo-projects/**/*.tmp
+            !godot-demo-projects/**/*.log
           retention-days: 30
+
+      - name: Clean exports for git safety
+        run: |
+          echo "🧹 Cleaning exports after documentation build..."
+          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
 
   deploy:
     name: 🚀 Deploy to GitHub Pages
