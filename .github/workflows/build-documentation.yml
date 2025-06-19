@@ -201,15 +201,7 @@ jobs:
           [ -f "_sidebar.md" ] && echo "  ✅ Sidebar generated" || echo "  ❌ Sidebar missing"
           echo "  Total projects: $(find godot-demo-projects -name project.godot | wc -l)"
 
-      - name: Archive build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: godot-exports-all
-          path: godot-demo-projects/
-          retention-days: 7
-          if-no-files-found: warn
-
-      # Note: Do NOT clean exports here - they're needed for documentation build
+      # Note: Exports are preserved for documentation build - no separate upload needed
 
       - name: Archive build logs
         if: always()
@@ -242,82 +234,46 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download build artifacts
-        if: needs.build-projects.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          name: godot-exports-all
-          path: ./built-projects
-
-      - name: Merge exports into documentation
+      - name: Setup Godot for export checking
         if: needs.build-projects.result == 'success'
         run: |
-          echo "🔄 Merging built exports into documentation structure..."
+          echo "🎮 Setting up Godot for export verification..."
           
-          # Debug: Check what's actually in the artifact
-          echo "🔍 Debug: Artifact root contents:"
-          ls -la ./built-projects/
-          echo ""
-          echo "🔍 Debug: Looking for export directories anywhere in artifact:"
-          find ./built-projects -type d -name "exports" | head -10
-          echo ""
-          echo "🔍 Debug: Looking for project structure:"
-          find ./built-projects -name "project.godot" | head -5
-          echo ""
+          # Download Godot for Linux (lightweight setup for checking exports)
+          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
           
-          # Strategy 1: Check if we have the full godot-demo-projects structure
-          if [ -d "./built-projects/godot-demo-projects" ]; then
-            echo "📂 Strategy 1: Found nested godot-demo-projects structure"
-            rsync -av --include="*/" --include="exports/" --include="exports/**" --exclude="*" \
-              ./built-projects/godot-demo-projects/ ./godot-demo-projects/
-              
-          # Strategy 2: Check if the artifact IS the godot-demo-projects directory (direct upload)
-          elif find ./built-projects -name "project.godot" | head -1 | grep -q .; then
-            echo "📂 Strategy 2: Artifact contains project files directly"
-            rsync -av --include="*/" --include="exports/" --include="exports/**" --exclude="*" \
-              ./built-projects/ ./godot-demo-projects/
-              
-          # Strategy 3: Look for any exports directories and try to reconstruct
-          elif find ./built-projects -name "exports" -type d | head -1 | grep -q .; then
-            echo "📂 Strategy 3: Found exports directories, reconstructing structure"
-            find ./built-projects -name "exports" -type d | while read export_dir; do
-              echo "  Processing: $export_dir"
-              # Try to extract project path by looking at parent directories
-              project_path=$(echo "$export_dir" | sed 's|./built-projects/||' | sed 's|/exports||')
-              if [ -n "$project_path" ] && [ "$project_path" != "exports" ]; then
-                echo "    Copying to godot-demo-projects/$project_path/"
-                mkdir -p "./godot-demo-projects/$project_path"
-                cp -r "$export_dir" "./godot-demo-projects/$project_path/"
-              fi
-            done
-            
-          else
-            echo "⚠️  No recognizable export structure found in artifact"
-            echo "🔍 Complete artifact structure (first 20 files):"
-            find ./built-projects -type f | head -20
-            echo "⚠️  Artifact size: $(du -sh ./built-projects)"
-          fi
+          echo "� Downloading Godot ${GODOT_VERSION}..."
+          wget -q "${GODOT_URL}" -O godot.zip
           
-          echo ""
-          echo "📊 Final export statistics after merge attempt:"
-          export_folders=$(find godot-demo-projects -name exports -type d | wc -l)
-          wasm_files=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l)
-          web_exports=$(find godot-demo-projects -name index.html -path "*/exports/*" | wc -l)
+          echo "� Extracting Godot..."
+          unzip -q godot.zip
           
-          echo "  Export folders: $export_folders"
-          echo "  WASM files: $wasm_files"
-          echo "  Web exports: $web_exports"
+          # Make Godot executable and move to a standard location
+          chmod +x Godot_v${GODOT_VERSION_STABLE}_linux.x86_64
+          sudo mv Godot_v${GODOT_VERSION_STABLE}_linux.x86_64 /usr/local/bin/godot
           
-          if [ "$export_folders" -gt 0 ]; then
-            echo "  ✅ Exports successfully merged!"
-            echo "  Sample paths:"
-            find godot-demo-projects -name exports -type d | head -3 | sed 's|^|    |'
-          else
-            echo "  ❌ No exports found after merge - this will cause deployment failure"
-          fi
+          echo "✅ Godot setup completed"
+          godot --version
           
-          # Clean up temporary directory
-          rm -rf ./built-projects
+          echo "🧹 Cleaning up..."
+          rm -f godot.zip
+
+      - name: Build all projects if needed
+        if: needs.build-projects.result != 'success'
+        run: |
+          echo "🏗️ Building projects in documentation job since build job failed or was skipped..."
+          
+          # Build all projects and generate documentation in one integrated step
+          python build_system/scons_build.py \
+            --projects-dir godot-demo-projects \
+            --godot-binary godot \
+            --godot-version ${{ env.GODOT_VERSION }} \
+            --jobs 4 \
+            --cache-dir .build_cache \
+            --continue-on-error \
+            --generate-docs \
+            --docs-output _sidebar.md \
+            --verbose
 
       - name: Process embeds for documentation
         run: |
@@ -436,6 +392,7 @@ jobs:
             _sidebar.md
             README.md
             DOCS.md
+            docsify-embed-godot.js
             godot-demo-projects/
             !godot-demo-projects/**/.git
             !godot-demo-projects/**/*.tmp

@@ -379,37 +379,33 @@ def main():
             # Generate embed HTML
             embed_html = generate_embed_html(game_file, args.width, args.height, {})
             
-            # Generate project path for marker  
-            project_path = str(project_dir.relative_to(projects_dir))
-            embed_marker = f"<!-- embed-{{{project_path}}} -->"
+            # Generate universal $PATH marker for JavaScript plugin
+            embed_marker = "<!-- embed-{$PATH} -->"
             
             # For Markdown files, we only add markers, not full HTML
             # The JavaScript plugin will handle rendering the actual embeds
-            if embed_marker in readme_content:
-                # Marker already exists, no need to change
+            if '<!-- embed-{$PATH}' in readme_content:
+                # $PATH marker already exists, no need to change
                 updated_content = readme_content
                 if args.verbose:
-                    print(f"  📌 Embed marker already exists: {embed_marker}")
-            elif '<!-- embed-{$PATH}' in readme_content:
-                # Keep the $PATH placeholder as-is - JavaScript will handle it
-                updated_content = readme_content
-                if args.verbose:
-                    print(f"  📌 $PATH marker found and preserved")
+                    print(f"  📌 $PATH marker already exists")
             elif '<!-- embed-{' in readme_content:
-                # Keep any existing embed marker as-is
-                updated_content = readme_content
+                # Replace any specific path marker with universal $PATH marker
+                import re
+                embed_pattern = r'<!-- embed-\{[^}]+\} -->'
+                updated_content = re.sub(embed_pattern, embed_marker, readme_content)
                 if args.verbose:
-                    print(f"  📌 Existing embed marker preserved")
+                    print(f"  � Replaced specific marker with $PATH marker")
             elif '<!-- AUTO-GENERATED EMBED MARKER' in readme_content:
-                # Replace auto-generated HTML with simple marker
+                # Replace auto-generated HTML with simple $PATH marker
                 import re
                 auto_pattern = r'<!-- AUTO-GENERATED EMBED MARKER[^>]*-->.*?(?=<!-- END AUTO-GENERATED EMBED MARKER -->)<!-- END AUTO-GENERATED EMBED MARKER -->'
-                # Replace with simple marker
+                # Replace with universal marker
                 updated_content = re.sub(auto_pattern, f"\n{embed_marker}\n", readme_content, flags=re.DOTALL)
                 if args.verbose:
-                    print(f"  🔄 Replaced auto-generated HTML with marker: {embed_marker}")
+                    print(f"  🔄 Replaced auto-generated HTML with $PATH marker")
             else:
-                # Add embed marker after first heading
+                # Add universal $PATH marker after first heading
                 lines = readme_content.split('\n')
                 insert_idx = 0
                 for i, line in enumerate(lines):
@@ -420,11 +416,11 @@ def main():
                             insert_idx += 1
                         break
                 
-                # Insert the embed marker (not HTML)
+                # Insert the universal $PATH marker
                 lines.insert(insert_idx, f"\n{embed_marker}\n")
                 updated_content = '\n'.join(lines)
                 if args.verbose:
-                    print(f"  ➕ Added embed marker: {embed_marker}")
+                    print(f"  ➕ Added $PATH marker")
             
             # Write to output directory or update in place
             if args.in_place:
