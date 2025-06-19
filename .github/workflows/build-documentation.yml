@@ -176,13 +176,31 @@ jobs:
 
       - name: Build all Godot projects and generate documentation
         run: |
-          echo "🏗️ Building all Godot projects with documentation generation..."
+          echo "🏗️ Building all Godot projects with web exports..."
           
           # Force clean any existing exports first
           echo "🧹 Cleaning any existing exports..."
           find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
           
-          # Build all projects and generate documentation in one integrated step
+          # Test Godot export functionality first
+          echo "🧪 Testing Godot export capability..."
+          cd godot-demo-projects/2d/bullet_shower
+          godot --headless --export-release web exports/web/index.html --quit
+          if [ -f "exports/web/index.html" ] && [ -f "exports/web/index.wasm" ]; then
+            echo "✅ Godot export test successful"
+            ls -la exports/web/
+          else
+            echo "❌ Godot export test failed"
+            echo "Files in exports/web/:"
+            ls -la exports/web/ || echo "No exports/web directory"
+            exit 1
+          fi
+          cd ../../..
+          
+          # Clean the test export
+          rm -rf godot-demo-projects/2d/bullet_shower/exports
+          
+          # Build all projects with the verified working export process
           python build_system/scons_build.py \
             --projects-dir godot-demo-projects \
             --godot-binary godot \
@@ -190,10 +208,32 @@ jobs:
             --jobs 4 \
             --cache-dir .build_cache \
             --continue-on-error \
-            --generate-docs \
-            --docs-output _sidebar.md \
             --force-rebuild \
-            ${{ github.event.inputs.force_rebuild == 'true' && '--force-rebuild' || '' }} \
+            --verbose
+          
+          # Verify exports were created
+          echo "🔍 Verifying exports were created..."
+          export_count=$(find godot-demo-projects -name "exports" -type d | wc -l)
+          wasm_count=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" | wc -l)
+          echo "Export directories created: $export_count"
+          echo "WASM files created: $wasm_count"
+          
+          if [ "$wasm_count" -eq 0 ]; then
+            echo "❌ No WASM files were created! Export process failed."
+            echo "Checking first few projects for errors..."
+            find godot-demo-projects -name project.godot | head -3 | while read project; do
+              project_dir=$(dirname "$project")
+              echo "Checking $project_dir..."
+              ls -la "$project_dir/" | grep -E "(export|error|log)" || echo "No export files found"
+            done
+            exit 1
+          fi
+          
+          # Generate documentation sidebar (separate from export process)
+          echo "📚 Generating documentation sidebar..."
+          python build_system/builders/sidebar_generator.py \
+            --projects-dir godot-demo-projects \
+            --output _sidebar.md \
             --verbose
 
       - name: Check build results
