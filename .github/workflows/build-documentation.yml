@@ -321,18 +321,25 @@ jobs:
 
       - name: Process embeds for documentation
         run: |
-          echo "🎮 Ensuring embeds are properly processed for documentation site..."
+          echo "🎮 Processing embeds for documentation site..."
           
-          # Verify embed injection worked during build
-          echo "📊 Checking embed injection status:"
-          if grep -r "<!-- EMBED:" godot-demo-projects/*/README.md | head -5; then
-            echo "✅ Embeds found in README files"
+          # Always run embed injection after exports are merged to ensure correct URLs
+          echo "🔄 Running embed injection with merged exports..."
+          python build_system/builders/embed_injector.py \
+            --projects-dir godot-demo-projects \
+            --in-place \
+            --verbose
+          
+          echo "📊 Verifying embed injection results:"
+          embed_count=$(grep -r "game-embed" godot-demo-projects/*/README.md | wc -l)
+          echo "  README files with embeds: $embed_count"
+          
+          if [ "$embed_count" -gt 0 ]; then
+            echo "  ✅ Embeds successfully injected"
+            echo "  Sample embed URLs:"
+            grep -r "src=" godot-demo-projects/*/README.md | head -3 | sed 's/.*src="//;s/".*//' | sed 's|^|    |'
           else
-            echo "⚠️  No embeds found, running injection again..."
-            python build_system/scons_build.py \
-              --inject-embeds \
-              --projects-dir godot-demo-projects \
-              --verbose
+            echo "  ⚠️  No embeds found after injection"
           fi
 
       - name: Verify documentation structure
