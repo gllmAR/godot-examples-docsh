@@ -302,14 +302,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Download export artifacts  
-        if: needs.build-projects.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: godot-exports
           path: ./
+        continue-on-error: true
 
       - name: Debug downloaded artifacts
-        if: needs.build-projects.result == 'success'
         run: |
           echo "🔍 Debug: Examining downloaded artifacts..."
           echo "Directory structure after download:"
@@ -325,7 +324,6 @@ jobs:
           find ./godot-demo-projects -type f | wc -l
 
       - name: Debug artifact structure
-        if: needs.build-projects.result == 'success'
         run: |
           echo "🔍 Debugging downloaded artifact structure:"
           echo "Current directory contents:"
@@ -343,32 +341,7 @@ jobs:
           echo "Full directory tree (first 3 levels):"
           find . -maxdepth 3 -type d | sort
 
-      - name: Setup Godot for export checking
-        if: needs.build-projects.result == 'success'
-        run: |
-          echo "🎮 Setting up Godot for export verification..."
-          
-          # Download Godot for Linux (lightweight setup for checking exports)
-          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
-          
-          echo "� Downloading Godot ${GODOT_VERSION}..."
-          wget -q "${GODOT_URL}" -O godot.zip
-          
-          echo "� Extracting Godot..."
-          unzip -q godot.zip
-          
-          # Make Godot executable and move to a standard location
-          chmod +x Godot_v${GODOT_VERSION_STABLE}_linux.x86_64
-          sudo mv Godot_v${GODOT_VERSION_STABLE}_linux.x86_64 /usr/local/bin/godot
-          
-          echo "✅ Godot setup completed"
-          godot --version
-          
-          echo "🧹 Cleaning up..."
-          rm -f godot.zip
-
       - name: Setup Godot for documentation build
-        if: needs.build-projects.result != 'success'
         run: |
           echo "🎮 Setting up Godot Engine ${GODOT_VERSION} for documentation build..."
           
@@ -401,22 +374,48 @@ jobs:
           echo "🧹 Cleaning up downloaded files..."
           rm -f godot.zip export_templates.tpz
 
-      - name: Build all projects if needed
-        if: needs.build-projects.result != 'success'
+      - name: Build or supplement exports if needed
         run: |
-          echo "🏗️ Building projects in documentation job since build job failed or was skipped..."
+          echo "🏗️ Checking if additional project building is needed..."
           
-          # Build all projects and generate documentation in one integrated step
-          python build_system/scons_build.py \
-            --projects-dir godot-demo-projects \
-            --godot-binary godot \
-            --godot-version ${{ env.GODOT_VERSION }} \
-            --jobs 4 \
-            --cache-dir .build_cache \
-            --continue-on-error \
-            --generate-docs \
-            --docs-output _sidebar.md \
-            --verbose
+          # Count current exports
+          current_exports=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" 2>/dev/null | wc -l)
+          total_projects=$(find godot-demo-projects -name project.godot 2>/dev/null | wc -l)
+          
+          echo "📊 Current state:"
+          echo "  Total projects: $total_projects"
+          echo "  Projects with WASM exports: $current_exports"
+          echo "  Build job result: ${{ needs.build-projects.result }}"
+          
+          # If we have very few exports compared to projects, build more
+          if [ "$current_exports" -lt 10 ] || [ "${{ needs.build-projects.result }}" != "success" ]; then
+            echo "🔧 Building additional projects to ensure comprehensive exports..."
+            
+            # Build all projects and generate documentation in one integrated step
+            python build_system/scons_build.py \
+              --projects-dir godot-demo-projects \
+              --godot-binary godot \
+              --godot-version ${{ env.GODOT_VERSION }} \
+              --jobs 4 \
+              --cache-dir .build_cache \
+              --continue-on-error \
+              --generate-docs \
+              --docs-output _sidebar.md \
+              --verbose
+              
+            # Check results
+            new_exports=$(find godot-demo-projects -name "*.wasm" -path "*/exports/*" 2>/dev/null | wc -l)
+            echo "📈 After building: $new_exports WASM files"
+          else
+            echo "✅ Sufficient exports already present, proceeding with documentation generation"
+            
+            # Just generate docs and embeds
+            echo "📚 Generating documentation sidebar..."
+            python build_system/builders/sidebar_generator.py \
+              --projects-dir godot-demo-projects \
+              --output _sidebar.md \
+              --verbose
+          fi
 
       - name: Process embeds for documentation
         run: |
