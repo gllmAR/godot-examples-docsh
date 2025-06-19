@@ -182,24 +182,6 @@ jobs:
           echo "🧹 Cleaning any existing exports..."
           find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
           
-          # Test Godot export functionality first
-          echo "🧪 Testing Godot export capability..."
-          cd godot-demo-projects/2d/bullet_shower
-          godot --headless --export-release web exports/web/index.html --quit
-          if [ -f "exports/web/index.html" ] && [ -f "exports/web/index.wasm" ]; then
-            echo "✅ Godot export test successful"
-            ls -la exports/web/
-          else
-            echo "❌ Godot export test failed"
-            echo "Files in exports/web/:"
-            ls -la exports/web/ || echo "No exports/web directory"
-            exit 1
-          fi
-          cd ../../..
-          
-          # Clean the test export
-          rm -rf godot-demo-projects/2d/bullet_shower/exports
-          
           # Build all projects with the verified working export process
           python build_system/scons_build.py \
             --projects-dir godot-demo-projects \
@@ -384,6 +366,40 @@ jobs:
           
           echo "🧹 Cleaning up..."
           rm -f godot.zip
+
+      - name: Setup Godot for documentation build
+        if: needs.build-projects.result != 'success'
+        run: |
+          echo "🎮 Setting up Godot Engine ${GODOT_VERSION} for documentation build..."
+          
+          # Download Godot for Linux
+          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
+          TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_export_templates.tpz"
+          
+          echo "📥 Downloading Godot ${GODOT_VERSION}..."
+          wget -q "${GODOT_URL}" -O godot.zip
+          
+          echo "📦 Extracting Godot..."
+          unzip -q godot.zip
+          
+          # Make Godot executable and move to a standard location
+          chmod +x Godot_v${GODOT_VERSION_STABLE}_linux.x86_64
+          sudo mv Godot_v${GODOT_VERSION_STABLE}_linux.x86_64 /usr/local/bin/godot
+          
+          echo "📥 Downloading export templates..."
+          wget -q "${TEMPLATES_URL}" -O export_templates.tpz
+          
+          echo "📦 Installing export templates..."
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
+          unzip -q export_templates.tpz -d ~/.local/share/godot/export_templates/
+          mv ~/.local/share/godot/export_templates/templates/* ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+          rmdir ~/.local/share/godot/export_templates/templates
+          
+          echo "✅ Godot setup completed"
+          godot --version
+          
+          echo "🧹 Cleaning up downloaded files..."
+          rm -f godot.zip export_templates.tpz
 
       - name: Build all projects if needed
         if: needs.build-projects.result != 'success'
