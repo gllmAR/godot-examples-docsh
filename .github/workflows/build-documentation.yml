@@ -321,25 +321,27 @@ jobs:
 
       - name: Process embeds for documentation
         run: |
-          echo "🎮 Processing embeds for documentation site..."
+          echo "🎮 Processing embed markers for documentation site..."
           
-          # Always run embed injection after exports are merged to ensure correct URLs
-          echo "🔄 Running embed injection with merged exports..."
+          # Ensure embed markers are present in README files (markers only, not HTML)
+          echo "🔄 Adding embed markers to README files..."
           python build_system/builders/embed_injector.py \
             --projects-dir godot-demo-projects \
             --in-place \
             --verbose
           
-          echo "📊 Verifying embed injection results:"
-          embed_count=$(grep -r "game-embed" godot-demo-projects/*/README.md | wc -l)
-          echo "  README files with embeds: $embed_count"
+          echo "📊 Verifying embed markers:"
+          marker_count=$(grep -r "<!-- embed-{" godot-demo-projects/*/README.md | wc -l)
+          path_marker_count=$(grep -r "<!-- embed-{\$PATH}" godot-demo-projects/*/README.md | wc -l)
+          echo "  README files with embed markers: $marker_count"
+          echo "  README files with \$PATH markers: $path_marker_count"
           
-          if [ "$embed_count" -gt 0 ]; then
-            echo "  ✅ Embeds successfully injected"
-            echo "  Sample embed URLs:"
-            grep -r "src=" godot-demo-projects/*/README.md | head -3 | sed 's/.*src="//;s/".*//' | sed 's|^|    |'
+          if [ "$((marker_count + path_marker_count))" -gt 0 ]; then
+            echo "  ✅ Embed markers present - JavaScript plugin will handle rendering"
+            echo "  Sample markers:"
+            grep -r "<!-- embed-{" godot-demo-projects/*/README.md | head -3 | sed 's|^|    |'
           else
-            echo "  ⚠️  No embeds found after injection"
+            echo "  ⚠️  No embed markers found"
           fi
 
       - name: Verify documentation structure
