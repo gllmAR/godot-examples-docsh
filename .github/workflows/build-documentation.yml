@@ -201,7 +201,17 @@ jobs:
           [ -f "_sidebar.md" ] && echo "  ✅ Sidebar generated" || echo "  ❌ Sidebar missing"
           echo "  Total projects: $(find godot-demo-projects -name project.godot | wc -l)"
 
-      # Note: Exports are preserved for documentation build - no separate upload needed
+      - name: Archive export artifacts for documentation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-exports
+          path: |
+            godot-demo-projects/*/exports/
+            !godot-demo-projects/**/.git
+            !godot-demo-projects/**/*.tmp
+            !godot-demo-projects/**/*.log
+          retention-days: 7
 
       - name: Archive build logs
         if: always()
@@ -233,6 +243,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Download export artifacts  
+        if: needs.build-projects.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-exports
+          path: ./
 
       - name: Setup Godot for export checking
         if: needs.build-projects.result == 'success'
@@ -341,6 +358,26 @@ jobs:
       - name: Build site with docsify
         run: |
           echo "🌐 Building static documentation site..."
+          
+          # Verify essential files exist
+          echo "🔍 Verifying essential documentation files..."
+          
+          if [ ! -f "index.html" ]; then
+            echo "❌ index.html not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "docsify-embed-godot.js" ]; then
+            echo "❌ docsify-embed-godot.js not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "_sidebar.md" ]; then
+            echo "❌ _sidebar.md not found!"
+            exit 1
+          fi
+          
+          echo "✅ All essential files present"
           
           # Install docsify-cli if needed for static generation
           npm install -g docsify-cli
