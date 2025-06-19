@@ -481,6 +481,57 @@ jobs:
             echo "  Continuing with documentation build for debugging..."
           fi
 
+      - name: Ensure exports are present for documentation
+        run: |
+          echo "🔍 Ensuring all exports are present for final documentation site..."
+          
+          # Count current exports
+          current_exports=$(find godot-demo-projects -name "exports" -type d | wc -l)
+          current_web=$(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)
+          current_wasm=$(find godot-demo-projects -name "*.wasm" -path '*/exports/*' | wc -l)
+          
+          echo "Current state:"
+          echo "  Export directories: $current_exports"
+          echo "  Web exports: $current_web"
+          echo "  WASM files: $current_wasm"
+          
+          # If we have few or no exports, but build-projects succeeded, there might be an integration issue
+          if [ "$current_wasm" -lt 10 ] && [ "${{ needs.build-projects.result }}" == "success" ]; then
+            echo "⚠️ Warning: Expected more exports since build job succeeded"
+            echo "🔍 Checking if godot-demo-projects directory structure is correct..."
+            
+            # Verify the structure exists
+            if [ -d "godot-demo-projects" ]; then
+              echo "✅ godot-demo-projects directory exists"
+              echo "📊 Project count: $(find godot-demo-projects -name project.godot | wc -l)"
+              
+              # Show a sample of what we have
+              echo "📁 Sample structure:"
+              find godot-demo-projects -name "project.godot" | head -3 | while read project; do
+                project_dir=$(dirname "$project")
+                echo "  Project: $project_dir"
+                if [ -d "$project_dir/exports" ]; then
+                  echo "    ✅ Has exports: $(find "$project_dir/exports" -name "*.wasm" | wc -l) WASM files"
+                else
+                  echo "    ❌ No exports directory"
+                fi
+              done
+            else
+              echo "❌ godot-demo-projects directory missing!"
+              echo "Current directory structure:"
+              ls -la ./
+            fi
+          fi
+          
+          # Final verification
+          if [ "$current_wasm" -gt 0 ]; then
+            echo "✅ Exports are present and will be included in documentation"
+            echo "📋 Sample export paths:"
+            find godot-demo-projects -name index.html -path '*/exports/*' | head -5 | sed 's|^|  /|'
+          else
+            echo "⚠️ No WASM exports found - documentation will show projects but games won't be playable"
+          fi
+
       - name: Build site with docsify
         run: |
           echo "🌐 Building static documentation site..."
@@ -546,6 +597,66 @@ jobs:
           EOF
           fi
 
+      - name: Final verification before artifact upload
+        run: |
+          echo "🔍 Final verification of documentation site content before upload..."
+          
+          # Verify all essential files exist
+          echo "📋 Essential files check:"
+          for file in "index.html" "_sidebar.md" "README.md" "docsify-embed-godot.js"; do
+            if [ -f "$file" ]; then
+              echo "  ✅ $file ($(du -h "$file" | cut -f1))"
+            else
+              echo "  ❌ $file (missing)"
+            fi
+          done
+          
+          # Verify godot-demo-projects structure
+          echo ""
+          echo "📁 Project structure verification:"
+          if [ -d "godot-demo-projects" ]; then
+            total_projects=$(find godot-demo-projects -name project.godot | wc -l)
+            export_dirs=$(find godot-demo-projects -name "exports" -type d | wc -l)
+            web_exports=$(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)
+            wasm_files=$(find godot-demo-projects -name "*.wasm" -path '*/exports/*' | wc -l)
+            readme_files=$(find godot-demo-projects -name README.md | wc -l)
+            
+            echo "  📊 Total projects: $total_projects"
+            echo "  📁 Export directories: $export_dirs"
+            echo "  🌐 Web exports: $web_exports"
+            echo "  📦 WASM files: $wasm_files"
+            echo "  📄 README files: $readme_files"
+            
+            # Calculate size
+            if [ "$wasm_files" -gt 0 ]; then
+              total_size=$(find godot-demo-projects -path "*/exports/*" -type f -exec du -b {} \; | awk '{sum+=$1} END {print sum}')
+              size_mb=$((total_size / 1024 / 1024))
+              echo "  💾 Total export size: ${size_mb}MB"
+            fi
+            
+            # Show sample structure
+            echo ""
+            echo "  📋 Sample exported projects:"
+            find godot-demo-projects -name index.html -path '*/exports/*' | head -5 | while read export_file; do
+              project_path=$(echo "$export_file" | sed 's|/exports/.*||')
+              project_name=$(basename "$project_path")
+              echo "    🎮 $project_name → /$export_file"
+            done
+            
+            # Verify embed markers
+            marker_count=$(grep -r "<!-- embed-{" godot-demo-projects/*/README.md 2>/dev/null | wc -l)
+            echo ""
+            echo "  🔗 Embed markers: $marker_count README files"
+            
+            if [ "$web_exports" -gt 0 ]; then
+              echo "  ✅ Ready for deployment - games will be playable!"
+            else
+              echo "  ⚠️  No web exports found - documentation only"
+            fi
+          else
+            echo "  ❌ godot-demo-projects directory missing!"
+          fi
+
       - name: Archive documentation site
         uses: actions/upload-artifact@v4
         with:
@@ -561,6 +672,32 @@ jobs:
             !godot-demo-projects/**/*.tmp
             !godot-demo-projects/**/*.log
           retention-days: 30
+
+      - name: Debug uploaded artifact content
+        run: |
+          echo "🔍 What was just uploaded to documentation-site artifact:"
+          echo "Files matching the upload patterns:"
+          
+          # Simulate what gets uploaded
+          echo "Root files:"
+          for file in index.html _sidebar.md README.md DOCS.md docsify-embed-godot.js; do
+            if [ -f "$file" ]; then
+              echo "  ✅ $file"
+            else
+              echo "  ❌ $file (missing)"
+            fi
+          done
+          
+          echo ""
+          echo "godot-demo-projects structure:"
+          if [ -d "godot-demo-projects" ]; then
+            echo "  📁 Directory exists"
+            echo "  📊 Total files: $(find godot-demo-projects -type f ! -path '*/.git/*' ! -name '*.tmp' ! -name '*.log' | wc -l)"
+            echo "  🎮 Export files: $(find godot-demo-projects -path '*/exports/*' -type f | wc -l)"
+            echo "  📦 WASM files: $(find godot-demo-projects -name '*.wasm' -path '*/exports/*' | wc -l)"
+          else
+            echo "  ❌ Directory missing!"
+          fi
 
   deploy:
     name: 🚀 Deploy to GitHub Pages
