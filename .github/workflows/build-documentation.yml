@@ -178,6 +178,10 @@ jobs:
         run: |
           echo "🏗️ Building all Godot projects with documentation generation..."
           
+          # Force clean any existing exports first
+          echo "🧹 Cleaning any existing exports..."
+          find godot-demo-projects -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
+          
           # Build all projects and generate documentation in one integrated step
           python build_system/scons_build.py \
             --projects-dir godot-demo-projects \
@@ -188,6 +192,7 @@ jobs:
             --continue-on-error \
             --generate-docs \
             --docs-output _sidebar.md \
+            --force-rebuild \
             ${{ github.event.inputs.force_rebuild == 'true' && '--force-rebuild' || '' }} \
             --verbose
 
@@ -201,16 +206,33 @@ jobs:
           [ -f "_sidebar.md" ] && echo "  ✅ Sidebar generated" || echo "  ❌ Sidebar missing"
           echo "  Total projects: $(find godot-demo-projects -name project.godot | wc -l)"
 
+      - name: Debug export structure before upload
+        if: always()
+        run: |
+          echo "🔍 Debug: Examining export structure before upload..."
+          echo "Export directories found:"
+          find godot-demo-projects -name "exports" -type d | head -10
+          echo ""
+          echo "Web export index.html files:"
+          find godot-demo-projects -name "index.html" -path "*/exports/*" | head -10
+          echo ""
+          echo "WASM files:"
+          find godot-demo-projects -name "*.wasm" -path "*/exports/*" | head -10
+          echo ""
+          echo "Total export file count:"
+          find godot-demo-projects -path "*/exports/*" -type f | wc -l
+
       - name: Archive export artifacts for documentation
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: godot-exports
           path: |
-            godot-demo-projects/*/exports/
+            godot-demo-projects/
             !godot-demo-projects/**/.git
             !godot-demo-projects/**/*.tmp
             !godot-demo-projects/**/*.log
+            !godot-demo-projects/**/build_cache.json
           retention-days: 7
 
       - name: Debug export structure before upload
@@ -263,6 +285,22 @@ jobs:
         with:
           name: godot-exports
           path: ./
+
+      - name: Debug downloaded artifacts
+        if: needs.build-projects.result == 'success'
+        run: |
+          echo "🔍 Debug: Examining downloaded artifacts..."
+          echo "Directory structure after download:"
+          find . -name "exports" -type d | head -10
+          echo ""
+          echo "Web exports found:"
+          find . -name "index.html" -path "*/exports/*" | head -10
+          echo ""
+          echo "WASM files found:"
+          find . -name "*.wasm" -path "*/exports/*" | head -10
+          echo ""
+          echo "Total files in godot-demo-projects:"
+          find ./godot-demo-projects -type f | wc -l
 
       - name: Debug artifact structure
         if: needs.build-projects.result == 'success'

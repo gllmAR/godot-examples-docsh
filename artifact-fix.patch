@@ -1,0 +1,41 @@
+# Fix for artifact structure issue
+# 
+# The problem: Using godot-demo-projects/*/exports/ in artifact upload
+# loses the directory structure. The solution is to upload the whole
+# godot-demo-projects directory but exclude non-export files.
+
+# Replace the artifact upload pattern:
+FROM:
+  path: |
+    godot-demo-projects/*/exports/
+    !godot-demo-projects/**/.git
+    !godot-demo-projects/**/*.tmp
+    !godot-demo-projects/**/*.log
+
+TO:
+  path: |
+    godot-demo-projects/
+    !godot-demo-projects/**/.git
+    !godot-demo-projects/**/*.tmp
+    !godot-demo-projects/**/*.log
+    !godot-demo-projects/**/project.godot
+    !godot-demo-projects/**/*.gd
+    !godot-demo-projects/**/*.cs
+    !godot-demo-projects/**/*.tres
+    !godot-demo-projects/**/*.tscn
+    !godot-demo-projects/**/*.import
+    !godot-demo-projects/**/*.png
+    !godot-demo-projects/**/*.jpg
+    !godot-demo-projects/**/*.wav
+    !godot-demo-projects/**/*.ogg
+    !godot-demo-projects/**/*.mp3
+    !godot-demo-projects/**/*.glb
+    !godot-demo-projects/**/*.obj
+    !godot-demo-projects/**/*.blend
+    !godot-demo-projects/**/addons
+    !godot-demo-projects/**/*.md
+    !godot-demo-projects/**/*.txt
+    !godot-demo-projects/**/icon.png
+    !godot-demo-projects/**/icon.svg
+    !godot-demo-projects/**/LICENSE*
+    !godot-demo-projects/**/.github
