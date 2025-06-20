@@ -101,10 +101,9 @@ jobs:
             cp -r godot-demo-projects/gui/control_gallery test-projects/
           fi
           
-          # Run the build system on test projects
-          python build_system/scons_build.py \
+          # Run the universal build system on test projects
+          python build_system/build.py build \
             --projects-dir test-projects \
-            --godot-binary godot \
             --jobs 1 \
             --verbose \
             --force-rebuild
