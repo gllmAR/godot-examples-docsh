@@ -104,11 +104,31 @@ The workflow now includes these validation steps:
 3. **Export Capability Test**: Try a complete export with proper export preset
 4. **Build Result Verification**: Count and verify all web exports were created
 
-## Critical Learning
-**Web export templates in Godot must be stored as ZIP files**, not extracted files. This is different from other platform templates which can be executables or other formats.
+## Current Status - RESOLVED! ✅
 
-The workflow should now successfully:
-- ✅ Install web export templates in ZIP format
-- ✅ Pass Godot's export template validation
-- ✅ Successfully export all 120 projects to web format
-- ✅ Include all web exports in the final documentation site
+**Export templates are now working correctly!**
+
+From the latest workflow logs:
+```
+✅ Found: web_nothreads_debug.zip
+✅ Found: web_nothreads_release.zip  
+✅ Found: web_debug.zip
+✅ Found: web_release.zip
+```
+
+### Final Fixes Applied:
+1. ✅ **Export Template Installation**: Fixed to keep web templates as ZIP files
+2. ✅ **Path Expansion**: Fixed validation script to use `$HOME` instead of `~`
+3. ✅ **Build System Arguments**: Fixed to use correct arguments (`-j` instead of `--parallel-jobs`)
+
+### Build Command Fixed:
+```bash
+python build_system/scons_build.py \
+  --projects-dir godot-demo-projects \
+  -j 4 \
+  --godot-version 4.5-beta1 \
+  --continue-on-error \
+  --verbose
+```
+
+**Next Steps**: The workflow should now successfully build all 120 projects with web exports!

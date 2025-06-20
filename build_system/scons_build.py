@@ -250,10 +250,9 @@ class BuildEnvironment:
         """Create web export preset for project"""
         preset_file = project_path / 'export_presets.cfg'
         
-        if preset_file.exists():
-            return  # Preset already exists
-        
-        preset_content = """[preset.0]
+        if not preset_file.exists():
+            # Create completely new preset file
+            preset_content = """[preset.0]
 
 name="web"
 platform="Web"
@@ -292,12 +291,75 @@ progressive_web_app/icon_180x180=""
 progressive_web_app/icon_512x512=""
 progressive_web_app/background_color=Color(0, 0, 0, 1)
 """
-        
-        try:
-            with open(preset_file, 'w') as f:
-                f.write(preset_content)
-        except IOError:
-            self._log('WARN', f"Failed to create export preset for {project_path}")
+            try:
+                with open(preset_file, 'w') as f:
+                    f.write(preset_content)
+            except IOError:
+                self._log('WARN', f"Failed to create export preset for {project_path}")
+        else:
+            # Check if web preset exists in existing file
+            try:
+                with open(preset_file, 'r') as f:
+                    content = f.read()
+                
+                # Check if there's already a web preset
+                if 'platform="Web"' in content or 'name="web"' in content:
+                    return  # Web preset already exists
+                
+                # Find the highest preset number
+                import re
+                preset_numbers = re.findall(r'\[preset\.(\d+)\]', content)
+                next_preset = max([int(n) for n in preset_numbers], default=-1) + 1
+                
+                # Append web preset
+                web_preset = f"""
+[preset.{next_preset}]
+
+name="web"
+platform="Web"
+runnable=true
+advanced_options=false
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter=""
+export_path="exports/web/index.html"
+encryption_include_filters=""
+encryption_exclude_filters=""
+encrypt_pck=false
+encrypt_directory=false
+
+[preset.{next_preset}.options]
+
+custom_template/debug=""
+custom_template/release=""
+variant/extensions_support=false
+vram_texture_compression/for_desktop=true
+vram_texture_compression/for_mobile=false
+html/export_icon=true
+html/custom_html_shell=""
+html/head_include=""
+html/canvas_resize_policy=2
+html/focus_canvas_on_start=true
+html/experimental_virtual_keyboard=false
+progressive_web_app/enabled=false
+progressive_web_app/offline_page=""
+progressive_web_app/display=1
+progressive_web_app/orientation=0
+progressive_web_app/icon_144x144=""
+progressive_web_app/icon_180x180=""
+progressive_web_app/icon_512x512=""
+progressive_web_app/background_color=Color(0, 0, 0, 1)
+"""
+                
+                with open(preset_file, 'a') as f:
+                    f.write(web_preset)
+                    
+                self._log('INFO', f"Added web export preset to {project_path.name}")
+                
+            except IOError:
+                self._log('WARN', f"Failed to modify export preset for {project_path}")
     
     def _export_project(self, target: ExportTarget) -> BuildResult:
         """Export a single Godot project"""
