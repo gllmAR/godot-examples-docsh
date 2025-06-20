@@ -241,7 +241,7 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
                     total = len(project_files)
                     self.progress.update_progress(
                         f"Exported {completed}/{total} projects",
-                        completed / total
+                        (completed / total) * 100
                     )
                     
                 except Exception as e:

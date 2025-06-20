@@ -348,7 +348,8 @@ def main():
                     # Fallback for CLI execution
                     import sys
                     tools_path = Path(__file__).parent / "tools"
-                    sys.path.append(str(tools_path))
+                    if str(tools_path) not in sys.path:
+                        sys.path.insert(0, str(tools_path))
                     from godot_exporter import GodotExporter, create_fallback_export
                     from parallel_manager import ParallelManager
                 

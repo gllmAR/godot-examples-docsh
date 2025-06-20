@@ -39,7 +39,7 @@ class GodotEnvironmentManager:
         self.arch = platform.machine().lower()
         self.config = config
         
-        # Set logging preferences
+        # Set logging preferences first (before platform info logging)
         self.verbose_downloads = (config and 
                                 hasattr(config, 'logging') and 
                                 getattr(config.logging, 'verbose_downloads', True))
@@ -51,6 +51,56 @@ class GodotEnvironmentManager:
                         getattr(config.logging, 'ci_mode', False)) or 
                        os.getenv('CI', '').lower() == 'true')
         
+        # Log detected platform information
+        self._log_platform_info()
+    
+    def _log_platform_info(self):
+        """Log detected platform information for debugging"""
+        platform_name = {
+            'linux': 'Linux',
+            'darwin': 'macOS', 
+            'windows': 'Windows'
+        }.get(self.system, self.system.title())
+        
+        # Detect more detailed architecture info
+        arch_info = self._get_detailed_arch_info()
+        
+        if self.verbose_downloads:
+            self.progress.info(f"🔍 Platform: {platform_name} ({arch_info})")
+            self.progress.info(f"📦 Binary suffix: {self._get_binary_suffix()}")
+    
+    def _get_detailed_arch_info(self) -> str:
+        """Get detailed architecture information"""
+        machine = platform.machine().lower()
+        processor = platform.processor().lower()
+        
+        # Enhanced architecture detection
+        if machine in ['x86_64', 'amd64']:
+            return "x86_64 (64-bit Intel/AMD)"
+        elif machine in ['i386', 'i686', 'x86']:
+            return "x86_32 (32-bit Intel/AMD)"
+        elif machine in ['arm64', 'aarch64']:
+            if 'apple' in processor or self.system == 'darwin':
+                return "ARM64 (Apple Silicon)"
+            else:
+                return "ARM64 (64-bit ARM)"
+        elif machine in ['armv7l', 'armv7']:
+            return "ARM32 (32-bit ARM)"
+        else:
+            return f"{machine} (architecture may not be fully supported)"
+    
+    def get_platform_info(self) -> Dict[str, str]:
+        """Get comprehensive platform information"""
+        return {
+            'system': self.system,
+            'machine': platform.machine(),
+            'processor': platform.processor(),
+            'architecture': platform.architecture()[0],
+            'platform': platform.platform(),
+            'binary_suffix': self._get_binary_suffix(),
+            'detailed_arch': self._get_detailed_arch_info()
+        }
+    
     def get_godot_urls(self, version: str) -> Tuple[str, str]:
         """Get download URLs for Godot binary and export templates"""
         
@@ -71,15 +121,43 @@ class GodotEnvironmentManager:
         return f"{base_url}/{binary_name}", f"{base_url}/{templates_name}"
     
     def _get_binary_suffix(self) -> str:
-        """Get the appropriate binary suffix for the current platform"""
+        """Get the appropriate binary suffix for the current platform with enhanced architecture support"""
+        machine = platform.machine().lower()
+        
         if self.system == "linux":
-            return "linux.x86_64.zip" if "x86_64" in self.arch else "linux.x86_32.zip"
+            # Enhanced Linux architecture support
+            if machine in ['x86_64', 'amd64']:
+                return "linux.x86_64.zip"
+            elif machine in ['i386', 'i686', 'x86']:
+                return "linux.x86_32.zip"
+            elif machine in ['arm64', 'aarch64']:
+                # ARM64 Linux support (available in newer Godot versions)
+                return "linux.arm64.zip"
+            elif machine in ['armv7l', 'armv7']:
+                # ARM32 Linux support (less common)
+                return "linux.arm32.zip"
+            else:
+                # Default to x86_64 for unknown architectures
+                self.progress.warning(f"⚠️ Unknown Linux architecture '{machine}', defaulting to x86_64")
+                return "linux.x86_64.zip"
+                
         elif self.system == "darwin":  # macOS
+            # macOS universal binaries work on both Intel and Apple Silicon
             return "macos.universal.zip"
+            
         elif self.system == "windows":
-            return "win64.exe.zip" if "64" in self.arch else "win32.exe.zip"
+            # Enhanced Windows architecture support
+            if machine in ['amd64', 'x86_64']:
+                return "win64.exe.zip"
+            elif machine in ['i386', 'i686', 'x86']:
+                return "win32.exe.zip"
+            else:
+                # Default to 64-bit for unknown architectures
+                self.progress.warning(f"⚠️ Unknown Windows architecture '{machine}', defaulting to 64-bit")
+                return "win64.exe.zip"
+                
         else:
-            raise ValueError(f"Unsupported platform: {self.system}")
+            raise ValueError(f"Unsupported platform: {self.system}. Supported platforms: Linux, macOS, Windows")
     
     def _get_template_version_format(self, version: str) -> str:
         """Convert version string to template directory format"""
