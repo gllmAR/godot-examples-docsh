@@ -1,12 +1,16 @@
-name: 🎮 Build Godot Examples Documentation
+name: 🎮 Build Godot Examples Documentation (BACKUP - DISABLED)
+
+# This is a backup of the original workflow - DISABLED to prevent conflicts
+# To enable this workflow, remove the 'workflow_dispatch:' section below and add back the original triggers
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
+      enable_backup:
+        description: 'Manually enable backup workflow (use only if main workflow fails)'
+        required: true
+        default: false
+        type: boolean
       force_rebuild:
         description: 'Force rebuild all projects'
         required: false
