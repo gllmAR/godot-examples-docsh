@@ -20,7 +20,14 @@ from typing import Optional, Tuple, Dict, List
 import subprocess
 import shutil
 
-from .progress_reporter import ProgressReporter
+try:
+    from .progress_reporter import ProgressReporter
+except ImportError:
+    # Fallback for CLI execution
+    import sys
+    import os
+    sys.path.append(os.path.dirname(__file__))
+    from progress_reporter import ProgressReporter
 
 
 class GodotEnvironmentManager:

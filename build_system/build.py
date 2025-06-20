@@ -287,9 +287,18 @@ def main():
             
             changed_projects = changes.changed_projects
         
+        # Determine Godot binary name - prefer system Godot if available
+        import shutil
+        if shutil.which("godot"):
+            godot_binary = "godot"
+        elif config.godot_version:
+            godot_binary = f"godot-{config.godot_version}"
+        else:
+            godot_binary = "godot"
+        
         # Create build environment
         env = ModernBuildEnvironment(
-            godot_binary=f"godot-{config.godot_version}" if config.godot_version else "godot",
+            godot_binary=godot_binary,
             projects_dir=project_root / config.structure.projects_dir,
             max_parallel_jobs=config.max_parallel_jobs,
             show_progress=args.progress,
@@ -331,8 +340,17 @@ def main():
             if args.target in ['build', 'all', 'final']:
                 progress.info("🎮 Building Godot projects...")
                 
-                # Modern build implementation
-                from .tools.parallel_manager import ParallelManager
+                # Import the real Godot exporter
+                try:
+                    from .tools.godot_exporter import GodotExporter, create_fallback_export
+                    from .tools.parallel_manager import ParallelManager
+                except ImportError:
+                    # Fallback for CLI execution
+                    import sys
+                    tools_path = Path(__file__).parent / "tools"
+                    sys.path.append(str(tools_path))
+                    from godot_exporter import GodotExporter, create_fallback_export
+                    from parallel_manager import ParallelManager
                 
                 # Find all Godot projects
                 projects_dir = project_root / config.structure.projects_dir
@@ -344,41 +362,62 @@ def main():
                     progress.info(f"📦 Found {len(project_files)} projects to process")
                     
                     if args.dry_run:
-                        progress.info("🔍 Would export {} projects".format(len(project_files)))
+                        progress.info("🔍 Would export {} projects using Godot".format(len(project_files)))
                     else:
-                        # For now, we'll create placeholder exports
-                        # This is a basic implementation - in production you'd want proper Godot exporting
-                        parallel_manager = ParallelManager()
-                        optimal_jobs = parallel_manager.get_optimal_job_count()
-                        progress.info(f"⚡ Using {optimal_jobs} parallel jobs")
+                        # Initialize real Godot exporter
+                        exporter = GodotExporter(
+                            godot_binary=godot_binary,  # Use the detected system binary
+                            progress_reporter=progress
+                        )
                         
-                        for i, project_file in enumerate(project_files):
-                            project_dir = project_file.parent
-                            export_dir = project_dir / "exports"
-                            export_dir.mkdir(exist_ok=True)
+                        # Verify Godot binary is available
+                        if not exporter.verify_godot_binary():
+                            progress.error(f"❌ Godot binary not found or not working: {env.config['godot_binary']}")
+                            progress.info("💡 Run 'python build_system/build.py setup --godot-version 4.5-beta1' to install Godot")
                             
-                            # Create a simple HTML5 export placeholder
-                            html_file = export_dir / "index.html"
-                            if not html_file.exists() or args.force_rebuild:
-                                html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>{project_dir.name}</title>
-</head>
-<body>
-    <h1>Godot Project: {project_dir.name}</h1>
-    <p>This is a placeholder for the exported Godot project.</p>
-    <p>Project location: {project_dir.relative_to(project_root)}</p>
-</body>
-</html>"""
-                                html_file.write_text(html_content)
+                            # Create fallback exports instead
+                            progress.info("🔄 Creating fallback HTML exports...")
+                            for project_file in project_files:
+                                project_dir = project_file.parent
+                                export_dir = project_dir / "exports" / "web"
+                                export_dir.mkdir(parents=True, exist_ok=True)
+                                create_fallback_export(project_dir, export_dir)
                             
-                            progress.update_progress(
-                                f"Exporting projects: {project_dir.name}", 
-                                (i + 1) / len(project_files)
+                            progress.warning("⚠️ Created fallback exports. Install Godot for real game exports.")
+                        else:
+                            # Use parallel export with real Godot
+                            parallel_manager = ParallelManager()
+                            optimal_jobs = min(parallel_manager.get_optimal_job_count(), 3)  # Limit to 3 for Godot exports
+                            progress.info(f"⚡ Using {optimal_jobs} parallel Godot export jobs")
+                            
+                            # Export projects in parallel
+                            results = exporter.export_projects_parallel(
+                                project_files,
+                                max_workers=optimal_jobs,
+                                force_rebuild=args.force_rebuild
                             )
-                        
-                        progress.success(f"✅ Successfully exported {len(project_files)} projects")
+                            
+                            # Generate summary
+                            summary = exporter.get_export_summary(results)
+                            
+                            if summary['failed'] > 0:
+                                progress.error(f"❌ {summary['failed']} exports failed: {summary['failed_projects']}")
+                                
+                                # Create fallback exports for failed projects
+                                for result in results:
+                                    if not result.success:
+                                        export_dir = result.project_path / "exports" / "web"
+                                        export_dir.mkdir(parents=True, exist_ok=True)
+                                        create_fallback_export(result.project_path, export_dir)
+                                
+                                if summary['successful'] > 0:
+                                    progress.warning(f"⚠️ {summary['successful']} succeeded, {summary['failed']} failed with fallbacks")
+                                else:
+                                    return 1
+                            else:
+                                progress.success(f"✅ Successfully exported {summary['successful']} projects")
+                                progress.info(f"📊 Total size: {summary['total_export_size']:,} bytes, "
+                                            f"avg time: {summary['average_export_time']:.1f}s per project")
             
             # Generate documentation and sidebar
             if args.target in ['docs', 'all', 'final']:

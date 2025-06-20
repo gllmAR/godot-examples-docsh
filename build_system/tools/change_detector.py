@@ -15,7 +15,14 @@ from typing import List, Dict, Set, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 
-from .progress_reporter import ProgressReporter
+try:
+    from .progress_reporter import ProgressReporter
+except ImportError:
+    # Fallback for CLI execution
+    import sys
+    import os
+    sys.path.append(os.path.dirname(__file__))
+    from progress_reporter import ProgressReporter
 
 
 @dataclass
