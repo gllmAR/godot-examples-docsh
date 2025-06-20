@@ -1,5 +1,27 @@
 # 🎉 SUCCESS REPORT: Godot Web Export Integration
 
+## ⚠️ CRITICAL ISSUE IDENTIFIED AND RESOLVED
+
+### Multiple Workflows Running Simultaneously
+**PROBLEM**: Two workflows with identical names and triggers were running at the same time:
+- `build-documentation.yml` (main workflow)
+- `build-documentation-backup.yml` (backup workflow)
+
+**SYMPTOMS**:
+- Export templates missing again after being successfully installed
+- Multiple concurrent builds competing for resources
+- Template installation conflicts
+
+**ROOT CAUSE**: Both workflows had:
+- Same name: "🎮 Build Godot Examples Documentation"
+- Same triggers: `push` to `main`, `pull_request`, `workflow_dispatch`
+- Same concurrency group: `${{ github.workflow }}-${{ github.ref }}`
+
+**RESOLUTION**:
+1. ✅ Disabled backup workflow automatic triggers (manual dispatch only)
+2. ✅ Updated main workflow concurrency group to be unique
+3. ✅ Renamed backup workflow to indicate disabled status
+
 ## MISSION ACCOMPLISHED! ✅
 
 ### Export Template Installation - RESOLVED
