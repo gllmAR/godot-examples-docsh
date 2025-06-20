@@ -1,8 +1,8 @@
 # Godot Examples Documentation
 
 <!-- Status Badges -->
-![Build Status](https://github.com/gllmar/godot-examples-docsh/workflows/🎮%20Build%20Godot%20Examples%20Documentation/badge.svg)
-![GitHub Pages](https://github.com/gllmar/godot-examples-docsh/workflows/pages/pages-build-deployment/badge.svg)
+![Build Status](https://github.com/gllmar/godot-examples-docsh/actions/workflows/build-documentation-universal.yml/badge.svg)
+![GitHub Pages](https://github.com/gllmar/godot-examples-docsh/actions/workflows/pages/pages-build-deployment/badge.svg)
 ![Godot 4.5-beta1](https://img.shields.io/badge/godot-4.5--beta1-blue)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
 
