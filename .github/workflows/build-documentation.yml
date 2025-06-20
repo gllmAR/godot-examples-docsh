@@ -142,6 +142,17 @@ jobs:
           echo "📦 Installing export templates..."
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
           unzip -q export_templates.tpz -d ~/.local/share/godot/export_templates/
+          
+          echo "🔍 Debug: Checking what was extracted..."
+          echo "Contents of export_templates after extraction:"
+          ls -la ~/.local/share/godot/export_templates/
+          
+          echo "Contents of templates directory:"
+          ls -la ~/.local/share/godot/export_templates/templates/ || echo "No templates directory found"
+          
+          # Check if there's a version.txt file to see the actual template version
+          find ~/.local/share/godot/export_templates/ -name "version.txt" -exec cat {} \; || echo "No version.txt found"
+          
           mv ~/.local/share/godot/export_templates/templates/* ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
           rmdir ~/.local/share/godot/export_templates/templates
           
@@ -149,7 +160,13 @@ jobs:
           godot --version
           
           echo "🔍 Verifying export templates..."
+          echo "Template directory structure:"
+          ls -la ~/.local/share/godot/export_templates/
+          echo "Contents of ${GODOT_TEMPLATE_VERSION} directory:"
           ls -la ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+          
+          echo "🔍 Searching for web templates specifically:"
+          find ~/.local/share/godot/export_templates/ -name "*web*" || echo "No web templates found"
           
           echo "🧹 Cleaning up downloaded files..."
           rm -f godot.zip export_templates.tpz
@@ -383,11 +400,28 @@ jobs:
           echo "📦 Installing export templates..."
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
           unzip -q export_templates.tpz -d ~/.local/share/godot/export_templates/
+          
+          echo "🔍 Debug: Checking what was extracted..."
+          echo "Contents of export_templates after extraction:"
+          ls -la ~/.local/share/godot/export_templates/
+          
+          echo "Contents of templates directory:"
+          ls -la ~/.local/share/godot/export_templates/templates/ || echo "No templates directory found"
+          
+          # Check if there's a version.txt file to see the actual template version
+          find ~/.local/share/godot/export_templates/ -name "version.txt" -exec cat {} \; || echo "No version.txt found"
+          
           mv ~/.local/share/godot/export_templates/templates/* ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
           rmdir ~/.local/share/godot/export_templates/templates
           
           echo "✅ Godot setup completed"
           godot --version
+          
+          echo "🔍 Verifying export templates..."
+          echo "Template directory structure:"
+          ls -la ~/.local/share/godot/export_templates/
+          echo "Contents of ${GODOT_TEMPLATE_VERSION} directory:"
+          ls -la ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
           
           echo "🧹 Cleaning up downloaded files..."
           rm -f godot.zip export_templates.tpz
