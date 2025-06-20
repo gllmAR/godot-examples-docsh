@@ -229,6 +229,12 @@ class ProgressReporter:
     
     def update_progress(self, description: str, progress: float):
         """Update progress with description and percentage"""
+        # Avoid excessive logging by only updating when progress changes significantly
+        progress_key = f"{description}:{progress:.1f}"
+        if hasattr(self, '_last_progress') and self._last_progress == progress_key:
+            return
+        
+        self._last_progress = progress_key
         bar_width = 20
         filled = int(bar_width * progress / 100)
         bar = "█" * filled + "░" * (bar_width - filled)

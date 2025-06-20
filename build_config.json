@@ -27,5 +27,10 @@
     "**/.*",
     "**/addons/godot-git-plugin/**",
     "**/exports/**"
-  ]
+  ],
+  "logging": {
+    "verbose_downloads": false,
+    "progress_updates": true,
+    "ci_mode": false
+  }
 }

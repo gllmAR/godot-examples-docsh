@@ -213,7 +213,7 @@ def main():
         if args.target == 'verify' or args.verify_environment:
             progress.info("🔍 Verifying Godot environment...")
             from tools.environment_manager import GodotEnvironmentManager
-            manager = GodotEnvironmentManager(progress)
+            manager = GodotEnvironmentManager(progress, config)
             verification = manager.verify_installation(config.godot_version)
             
             all_good = all(verification.values())

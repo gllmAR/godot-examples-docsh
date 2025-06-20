@@ -41,6 +41,23 @@ class ProjectStructure:
 
 
 @dataclass
+class LoggingConfig:
+    """Logging configuration for the build system"""
+    verbose_downloads: bool = False       # Show detailed download progress
+    progress_updates: bool = True         # Show progress bars
+    ci_mode: bool = False                # Enable CI-friendly logging
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return asdict(self)
+    
+    @classmethod 
+    def from_dict(cls, data: Dict[str, Any]) -> 'LoggingConfig':
+        """Create from dictionary"""
+        return cls(**data)
+
+
+@dataclass
 class BuildSystemConfig:
     """Main configuration for the build system"""
     # Project identification
@@ -66,6 +83,9 @@ class BuildSystemConfig:
     # Project structure
     structure: ProjectStructure = field(default_factory=ProjectStructure)
     
+    # Logging configuration
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
+    
     # Custom patterns and filters
     project_include_patterns: Optional[List[str]] = None
     project_exclude_patterns: Optional[List[str]] = None
@@ -89,6 +109,7 @@ class BuildSystemConfig:
         """Convert to dictionary for serialization"""
         data = asdict(self)
         data['structure'] = self.structure.to_dict()
+        data['logging'] = self.logging.to_dict()
         return data
     
     @classmethod
@@ -96,6 +117,8 @@ class BuildSystemConfig:
         """Create from dictionary"""
         if 'structure' in data:
             data['structure'] = ProjectStructure.from_dict(data['structure'])
+        if 'logging' in data:
+            data['logging'] = LoggingConfig.from_dict(data['logging'])
         return cls(**data)
     
     def save_to_file(self, config_path: Path):

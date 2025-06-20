@@ -13,6 +13,8 @@ import tempfile
 import zipfile
 import urllib.request
 import urllib.error
+import time
+import socket
 from pathlib import Path
 from typing import Optional, Tuple, Dict, List
 import subprocess
@@ -24,10 +26,23 @@ from .progress_reporter import ProgressReporter
 class GodotEnvironmentManager:
     """Manages Godot engine installation and export templates"""
     
-    def __init__(self, progress_reporter: Optional[ProgressReporter] = None):
+    def __init__(self, progress_reporter: Optional[ProgressReporter] = None, config=None):
         self.progress = progress_reporter or ProgressReporter()
         self.system = platform.system().lower()
         self.arch = platform.machine().lower()
+        self.config = config
+        
+        # Set logging preferences
+        self.verbose_downloads = (config and 
+                                hasattr(config, 'logging') and 
+                                getattr(config.logging, 'verbose_downloads', True))
+        self.show_progress = (config and 
+                            hasattr(config, 'logging') and 
+                            getattr(config.logging, 'progress_updates', True))
+        self.ci_mode = ((config and 
+                        hasattr(config, 'logging') and 
+                        getattr(config.logging, 'ci_mode', False)) or 
+                       os.getenv('CI', '').lower() == 'true')
         
     def get_godot_urls(self, version: str) -> Tuple[str, str]:
         """Get download URLs for Godot binary and export templates"""
@@ -70,37 +85,83 @@ class GodotEnvironmentManager:
         else:
             return version
     
-    def download_file(self, url: str, destination: Path, description: str = "file") -> bool:
-        """Download a file with progress reporting"""
-        try:
-            self.progress.info(f"📥 Downloading {description}...")
-            self.progress.info(f"🔗 URL: {url}")
-            
-            with urllib.request.urlopen(url) as response:
-                total_size = int(response.headers.get('content-length', 0))
+    def download_file(self, url: str, destination: Path, description: str = "file", retries: int = 3) -> bool:
+        """Download a file with progress reporting and retry logic"""
+        for attempt in range(retries):
+            try:
+                if attempt > 0:
+                    self.progress.info(f"📥 Retrying download {description} (attempt {attempt + 1}/{retries})...")
+                else:
+                    self.progress.info(f"📥 Downloading {description}...")
                 
-                with open(destination, 'wb') as f:
-                    downloaded = 0
-                    while True:
-                        chunk = response.read(8192)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
+                if attempt == 0 and self.verbose_downloads:  # Only show URL on first attempt and if verbose
+                    self.progress.info(f"🔗 URL: {url}")
+                
+                # Set timeout for the request
+                request = urllib.request.Request(url)
+                # Set socket timeout to prevent hanging
+                socket.setdefaulttimeout(60)
+                
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    total_size = int(response.headers.get('content-length', 0))
+                    
+                    with open(destination, 'wb') as f:
+                        downloaded = 0
+                        last_progress = -1
+                        last_update_time = time.time()
                         
-                        if total_size > 0:
-                            progress = (downloaded / total_size) * 100
-                            self.progress.update_progress(f"Downloading {description}", progress)
-            
-            self.progress.success(f"✅ Downloaded {description}")
-            return True
-            
-        except urllib.error.URLError as e:
-            self.progress.error(f"❌ Failed to download {description}: {e}")
-            return False
-        except Exception as e:
-            self.progress.error(f"❌ Unexpected error downloading {description}: {e}")
-            return False
+                        while True:
+                            start_time = time.time()
+                            chunk = response.read(8192)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            current_time = time.time()
+                            
+                            if total_size > 0 and self.show_progress:
+                                progress = (downloaded / total_size) * 100
+                                # In CI mode, update less frequently to reduce log spam
+                                update_threshold = 5.0 if self.ci_mode else 1.0
+                                update_interval = 10.0 if self.ci_mode else 2.0
+                                
+                                if (abs(progress - last_progress) >= update_threshold or 
+                                    current_time - last_update_time >= update_interval):
+                                    self.progress.update_progress(f"Downloading {description}", progress)
+                                    last_progress = progress
+                                    last_update_time = current_time
+                            
+                            # Detect if download is stalled (no data for 30 seconds)
+                            if current_time - start_time > 30:
+                                raise TimeoutError("Download stalled - no data received for 30 seconds")
+                
+                # Clear the progress line and show completion
+                if self.show_progress:
+                    print()  # New line to clear progress bar
+                self.progress.success(f"✅ Downloaded {description}")
+                return True
+                
+            except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
+                if self.show_progress:
+                    print()  # New line to clear progress bar
+                if attempt < retries - 1:
+                    self.progress.warning(f"⚠️  Download attempt {attempt + 1} failed: {e}")
+                    if not self.ci_mode:
+                        self.progress.info("🔄 Waiting 5 seconds before retry...")
+                        time.sleep(5)
+                    else:
+                        time.sleep(2)  # Shorter wait in CI
+                else:
+                    self.progress.error(f"❌ Failed to download {description} after {retries} attempts: {e}")
+                    return False
+            except Exception as e:
+                if self.show_progress:
+                    print()  # New line to clear progress bar
+                self.progress.error(f"❌ Unexpected error downloading {description}: {e}")
+                return False
+        
+        return False
     
     def install_godot_binary(self, version: str, install_path: Optional[Path] = None) -> Optional[Path]:
         """Download and install Godot binary"""
