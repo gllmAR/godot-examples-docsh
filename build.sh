@@ -48,7 +48,7 @@ show_help() {
 Godot Examples Documentation Build System
 ========================================
 
-Simple wrapper for the SCons-based build system.
+Simple wrapper for the Universal Godot Build System.
 This script provides an easy interface to build the Godot Examples documentation.
 
 Usage:
@@ -96,10 +96,10 @@ clean_build() {
     echo -e "${YELLOW}🗑️  Removing all export directories...${NC}"
     find "$SCRIPT_DIR/godot-demo-projects" -name "exports" -type d -exec rm -rf {} + 2>/dev/null || true
     
-    # Clean SCons cache and build files
-    echo -e "${YELLOW}🧽 Cleaning SCons cache and build files...${NC}"
-    rm -rf "$BUILD_SYSTEM_DIR/.scons_cache" 2>/dev/null || true
-    rm -f "$BUILD_SYSTEM_DIR/.sconsign.dblite" 2>/dev/null || true
+    # Clean build cache and temporary files
+    echo -e "${YELLOW}🧽 Cleaning build cache and temporary files...${NC}"
+    rm -rf "$BUILD_SYSTEM_DIR/.build_cache" 2>/dev/null || true
+    rm -rf "$BUILD_SYSTEM_DIR/cache" 2>/dev/null || true
     rm -rf "$BUILD_SYSTEM_DIR/build" 2>/dev/null || true
     
     # Clean any .godot directories from export paths

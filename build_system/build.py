@@ -16,8 +16,8 @@ from pathlib import Path
 build_system_path = Path(__file__).parent
 sys.path.insert(0, str(build_system_path))
 
-from config.project_config import BuildSystemConfig, setup_build_system
-from scons_build import BuildEnvironment
+from project_config import BuildSystemConfig, setup_build_system
+from modern_build_env import ModernBuildEnvironment
 from tools.environment_manager import setup_godot_environment
 from tools.artifact_manager import ArtifactManager
 from tools.change_detector import detect_changes
@@ -171,12 +171,12 @@ def main():
     
     # Load configuration
     if args.config and args.config.exists():
-        config = BuildSystemConfig.load_from_file(args.config)
+        config = BuildSystemConfig.from_json_file(args.config)
     else:
         # Try to load from default location or create new
         default_config_path = project_root / "build_config.json"
         if default_config_path.exists():
-            config = BuildSystemConfig.load_from_file(default_config_path)
+            config = BuildSystemConfig.from_json_file(default_config_path)
         else:
             config = setup_build_system(project_root)
     
@@ -288,7 +288,7 @@ def main():
             changed_projects = changes.changed_projects
         
         # Create build environment
-        env = BuildEnvironment(
+        env = ModernBuildEnvironment(
             godot_binary=f"godot-{config.godot_version}" if config.godot_version else "godot",
             projects_dir=project_root / config.structure.projects_dir,
             max_parallel_jobs=config.max_parallel_jobs,
@@ -306,44 +306,49 @@ def main():
         
         if args.preview:
             progress.info("📋 Build Plan Preview:")
-            # Scan for projects to show what would be built
-            targets = env.ScanForProjects(config.structure.projects_dir)
+            # For preview mode, just scan the directory for projects
+            projects_dir = project_root / config.structure.projects_dir
+            project_files = list(projects_dir.rglob("project.godot"))
+            
             if changed_projects:
                 # Filter to only changed projects
-                filtered_targets = []
-                for target in targets:
-                    project_rel = str(target.project_path.relative_to(project_root / config.structure.projects_dir))
+                filtered_files = []
+                for project_file in project_files:
+                    project_rel = str(project_file.parent.relative_to(projects_dir))
                     if any(project_rel.startswith(changed) for changed in changed_projects):
-                        filtered_targets.append(target)
-                targets = filtered_targets
+                        filtered_files.append(project_file)
+                project_files = filtered_files
             
-            progress.info(f"Found {len(targets)} projects to build:")
-            for target in targets[:10]:  # Show first 10
-                progress.info(f"  - {target.project_path.name}")
-            if len(targets) > 10:
-                progress.info(f"  ... and {len(targets) - 10} more")
+            progress.info(f"Found {len(project_files)} projects to build:")
+            for project_file in project_files[:10]:  # Show first 10
+                progress.info(f"  - {project_file.parent.name}")
+            if len(project_files) > 10:
+                progress.info(f"  ... and {len(project_files) - 10} more")
             return 0
         
         # Perform the actual build
         if args.target in ['all', 'build', 'docs', 'final']:
             if args.target in ['build', 'all', 'final']:
                 progress.info("🎮 Building Godot projects...")
-                targets = env.ScanForProjects(config.structure.projects_dir)
                 
-                # Filter targets if we have specific changed projects
-                if changed_projects and not args.force_rebuild:
-                    original_count = len(targets)
-                    filtered_targets = []
-                    for target in targets:
-                        project_rel = str(target.project_path.relative_to(project_root / config.structure.projects_dir))
-                        if any(project_rel.startswith(changed) for changed in changed_projects):
-                            filtered_targets.append(target)
-                    targets = filtered_targets
-                    progress.info(f"🎯 Building {len(targets)} changed projects (out of {original_count} total)")
+                # Use the legacy scons_build.py for now until fully modernized
+                build_args = [
+                    sys.executable, str(project_root / "build_system" / "legacy" / "scons_build.py"),
+                    '--projects-dir', str(project_root / config.structure.projects_dir),
+                    '--godot-binary', env.config['godot_binary'],
+                    '--jobs', str(env.get_parallel_jobs()),
+                ]
                 
-                success = env.Build(targets)
+                if config.verbose_output:
+                    build_args.append('--verbose')
+                if args.force_rebuild:
+                    build_args.append('--force-rebuild')
+                if config.enable_caching:
+                    build_args.extend(['--cache-dir', str(project_root / '.build_cache')])
                 
-                if not success:
+                result = subprocess.run(build_args, capture_output=not config.verbose_output)
+                
+                if result.returncode != 0:
                     progress.error("❌ Some builds failed")
                     return 1
             
@@ -352,7 +357,7 @@ def main():
                 progress.info("📚 Generating documentation and sidebar...")
                 
                 # Generate sidebar
-                sidebar_script = project_root / "build_system" / "builders" / "sidebar_generator.py"
+                sidebar_script = project_root / "build_system" / "legacy" / "builders" / "sidebar_generator.py"
                 sidebar_output = project_root / "_sidebar.md"
                 
                 result = subprocess.run([
@@ -373,10 +378,9 @@ def main():
                 
                 # Add embed markers first
                 result = subprocess.run([
-                    sys.executable, str(project_root / "build_system" / "scons_build.py"),
-                    '--add-embed-markers',
+                    sys.executable, str(project_root / "build_system" / "legacy" / "builders" / "embed_injector.py"), 'add-markers',
                     '--projects-dir', str(project_root / config.structure.projects_dir),
-                    '--verbose' if config.verbose_output else ''
+                    '--verbose' if config.verbose_output else '--quiet'
                 ], capture_output=not config.verbose_output)
                 
                 if result.returncode == 0:
@@ -384,10 +388,10 @@ def main():
                     
                     # Inject actual embeds
                     result = subprocess.run([
-                        sys.executable, str(project_root / "build_system" / "scons_build.py"),
-                        '--inject-embeds',
+                        sys.executable, str(project_root / "build_system" / "legacy" / "builders" / "embed_injector.py"),
                         '--projects-dir', str(project_root / config.structure.projects_dir),
-                        '--verbose' if config.verbose_output else ''
+                        '--in-place',
+                        '--verbose' if config.verbose_output else '--quiet'
                     ], capture_output=not config.verbose_output)
                     
                     if result.returncode == 0:
