@@ -406,7 +406,7 @@ def main():
                             
                             # Get category (first level directory)
                             parts = relative_path.parts
-                            if parts:
+                            if parts and len(parts) > 0:
                                 category = parts[0]
                                 project_name = parts[-1] if len(parts) > 1 else parts[0]
                                 
