@@ -1,6 +1,6 @@
 #!/bin/bash
-# Godot Examples Documentation Build System
-# Simple wrapper for the SCons-based build system
+# Universal Godot Build System Wrapper
+# Simple bash wrapper for the Python-based build system
 
 set -e  # Exit on error
 
@@ -19,44 +19,21 @@ BUILD_SYSTEM_DIR="$SCRIPT_DIR/build_system"
 check_dependencies() {
     echo -e "${BLUE}🔍 Checking system dependencies...${NC}"
     
+    # Check Python
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${RED}❌ Python 3 is required but not found${NC}"
+        return 1
+    fi
+    
     # Run the Python dependency checker
-    if command -v python3 &> /dev/null; then
-        if python3 "$BUILD_SYSTEM_DIR/tools/dependency_checker.py" "$@"; then
-            echo -e "${GREEN}✅ All dependencies satisfied!${NC}"
-            return 0
-        else
-            echo -e "${RED}❌ Dependency check failed!${NC}"
-            echo -e "${YELLOW}💡 Tip: Run with --auto-install to attempt automatic installation${NC}"
-            return 1
-        fi
+    if python3 "$BUILD_SYSTEM_DIR/tools/dependency_checker.py" "$@"; then
+        echo -e "${GREEN}✅ All dependencies satisfied!${NC}"
+        return 0
     else
-        echo -e "${RED}❌ Python 3 not found!${NC}"
-        echo -e "${YELLOW}Please install Python 3.6+ first:${NC}"
-        case "$OSTYPE" in
-            darwin*)
-                echo "  brew install python3"
-                ;;
-            linux*)
-                echo "  sudo apt install python3  # Debian/Ubuntu"
-                echo "  sudo dnf install python3  # Fedora"
-                echo "  sudo pacman -S python     # Arch"
-                ;;
-            msys*|cygwin*)
-                echo "  Download from: https://www.python.org/downloads/"
-                ;;
-        esac
+        echo -e "${RED}❌ Dependency check failed!${NC}"
+        echo -e "${YELLOW}💡 Tip: Run with --auto-install to attempt automatic installation${NC}"
         return 1
     fi
-}
-
-# Legacy SCons check (kept for compatibility)
-legacy_scons_check() {
-    if ! command -v scons &> /dev/null; then
-        echo -e "${RED}❌ SCons not found!${NC}"
-        echo "Please install SCons using: brew install scons"
-        return 1
-    fi
-    return 0
 }
 
 # Check if build system directory exists
@@ -239,53 +216,54 @@ elif [[ "$SKIP_DEPS" != true ]]; then
     echo ""
 fi
 
-# Perform clean if requested
+# Convert bash arguments to Python arguments for the new build system
+PYTHON_ARGS=()
+
+# Add target
+if [[ -n "$BUILD_TARGET" ]]; then
+    PYTHON_ARGS+=("$BUILD_TARGET")
+else
+    PYTHON_ARGS+=("all")
+fi
+
+# Convert common flags
 if [[ "$CLEAN_BUILD" == true ]]; then
-    clean_build
-    echo ""
+    PYTHON_ARGS+=("--clean")
 fi
 
-# Handle special build targets
-if [[ "$BUILD_TARGET" == "add-markers" ]]; then
-    echo -e "\n${GREEN}🔗 Adding embed markers to README files...${NC}"
-    cd "$SCRIPT_DIR"
-    python build_system/builders/embed_injector.py add-markers --projects-dir godot-demo-projects --verbose
-    exit $?
-elif [[ "$BUILD_TARGET" == "inject-embeds" ]]; then
-    echo -e "\n${GREEN}🎮 Injecting embeds into README files...${NC}"
-    cd "$SCRIPT_DIR" 
-    python build_system/builders/embed_injector.py --projects-dir godot-demo-projects --verbose
-    exit $?
-elif [[ "$BUILD_TARGET" == "final" ]]; then
-    # Build everything then inject embeds
-    SCONS_ARGS+=("all")
-    echo -e "\n${GREEN}🏃 Building projects first...${NC}"
-    if scons "${SCONS_ARGS[@]}"; then
-        echo -e "\n${GREEN}🎮 Now injecting embeds...${NC}"
-        cd "$SCRIPT_DIR"
-        python build_system/builders/embed_injector.py --projects-dir godot-demo-projects --verbose
-        if [[ $? -eq 0 ]]; then
-            echo -e "\n${GREEN}✅ Final build with embeds completed successfully!${NC}"
-        else
-            echo -e "\n${YELLOW}⚠️  Build completed but embed injection had warnings${NC}"
-        fi
-    else
-        echo -e "\n${RED}❌ Build failed!${NC}"
-        exit 1
-    fi
-    exit 0
+if [[ "$PREVIEW_ONLY" == true ]]; then
+    PYTHON_ARGS+=("--preview")
 fi
 
-# Change to build system directory
-cd "$BUILD_SYSTEM_DIR"
+if [[ "$SHOW_PROGRESS" == true ]]; then
+    PYTHON_ARGS+=("--progress")
+fi
+
+if [[ "$VERBOSE_BUILD" == true ]]; then
+    PYTHON_ARGS+=("--verbose")
+fi
+
+if [[ -n "$NUM_JOBS" ]]; then
+    PYTHON_ARGS+=("--jobs" "$NUM_JOBS")
+fi
+
+if [[ -n "$GODOT_BINARY" ]]; then
+    # Extract just the version from the binary path if it contains version info
+    PYTHON_ARGS+=("--godot-binary" "$GODOT_BINARY")
+fi
+
+if [[ -n "$GODOT_VERSION" ]]; then
+    PYTHON_ARGS+=("--godot-version" "$GODOT_VERSION")
+fi
 
 # Print build info
-echo -e "${GREEN}📁 Build System:${NC} $BUILD_SYSTEM_DIR"
-echo -e "${GREEN}⚙️  SCons Arguments:${NC} ${SCONS_ARGS[*]}"
+echo -e "${GREEN}📁 Project Root:${NC} $SCRIPT_DIR"
+echo -e "${GREEN}⚙️  Build Arguments:${NC} ${PYTHON_ARGS[*]}"
 
-# Run SCons
+# Run the new Python-based build system
 echo -e "\n${GREEN}🏃 Starting build...${NC}"
-if scons "${SCONS_ARGS[@]}"; then
+cd "$SCRIPT_DIR"
+if python3 "$BUILD_SYSTEM_DIR/build.py" "${PYTHON_ARGS[@]}"; then
     echo -e "\n${GREEN}✅ Build completed successfully!${NC}"
 else
     echo -e "\n${RED}❌ Build failed!${NC}"

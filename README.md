@@ -150,6 +150,16 @@ This project has been migrated from the external `docsh` submodule to an integra
 - Real-time progress monitoring
 - Unified workflow for building and documentation
 
+**🔮 Future: Modular Build System**
+
+The `build_system/` directory is designed to become a reusable component that can be extracted as a submodule for other Godot example repositories. This will enable:
+- **Universal compatibility** across different project structures
+- **Shared maintenance** of build system improvements
+- **Consistent tooling** across the Godot examples ecosystem
+- **Community contributions** to build system functionality
+
+See `build_system/README.md` for details on the modular architecture.
+
 ## 🤝 Contributing
 
 1. Fork the repository

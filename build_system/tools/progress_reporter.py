@@ -209,6 +209,30 @@ class ProgressReporter:
                 return f"{size_float:.1f}{unit}"
             size_float /= 1024.0
         return f"{size_float:.1f}TB"
+    
+    # Additional utility methods for general logging
+    def info(self, message: str):
+        """Log an info message"""
+        print(message)
+    
+    def success(self, message: str):
+        """Log a success message"""
+        print(message)
+    
+    def error(self, message: str):
+        """Log an error message"""
+        print(message)
+    
+    def warning(self, message: str):
+        """Log a warning message"""
+        print(message)
+    
+    def update_progress(self, description: str, progress: float):
+        """Update progress with description and percentage"""
+        bar_width = 20
+        filled = int(bar_width * progress / 100)
+        bar = "█" * filled + "░" * (bar_width - filled)
+        print(f"\r{description}: [{bar}] {progress:.1f}%", end="", flush=True)
 
 
 # Singleton instance for global use

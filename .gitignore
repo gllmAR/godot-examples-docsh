@@ -39,6 +39,16 @@ build_cache.json
 build_artifacts/
 *.build_cache
 
+# Build system configuration (keep only the default)
+# build_config.json should be committed for the main project
+# but ignored if this becomes a submodule template
+
+# Development and testing artifacts
+test_*.py
+*_test.py
+*.patch
+artifact-*.patch
+
 # CI/CD specific build files
 ci_build/
 .ci_build/

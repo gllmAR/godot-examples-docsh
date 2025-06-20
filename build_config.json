@@ -1,0 +1,31 @@
+{
+  "project_name": "Godot Examples Documentation",
+  "project_url": "https://gllmar.github.io/godot-examples-docsh/",
+  "godot_version": "4.5-beta1",
+  "python_version": "3.11",
+  "max_parallel_jobs": null,
+  "enable_web_exports": true,
+  "enable_documentation_generation": true,
+  "enable_embed_injection": true,
+  "enable_sidebar_generation": true,
+  "enable_caching": true,
+  "verbose_output": false,
+  "dry_run_mode": false,
+  "structure": {
+    "projects_dir": "godot-demo-projects",
+    "docs_dir": "docs",
+    "cache_dir": ".build_cache",
+    "site_root": ".",
+    "sidebar_file": "_sidebar.md",
+    "index_file": "index.html",
+    "exports_subdir": "exports/web"
+  },
+  "project_include_patterns": [
+    "**/project.godot"
+  ],
+  "project_exclude_patterns": [
+    "**/.*",
+    "**/addons/godot-git-plugin/**",
+    "**/exports/**"
+  ]
+}
