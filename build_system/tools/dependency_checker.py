@@ -34,11 +34,6 @@ class DependencyChecker:
                 'required': True,
                 'description': 'Python 3.6 or higher'
             },
-            'scons': {
-                'command': ['scons', '--version'],
-                'required': True,
-                'description': 'SCons build system'
-            },
             'godot': {
                 'command': ['godot', '--version'],
                 'required': True,
