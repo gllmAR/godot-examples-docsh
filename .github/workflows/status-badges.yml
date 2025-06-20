@@ -81,4 +81,3 @@ jobs:
           echo ""
           echo "🔍 For detailed build information, check the workflow run at:"
           echo "   https://github.com/${{ github.repository }}/actions"
-          fi
