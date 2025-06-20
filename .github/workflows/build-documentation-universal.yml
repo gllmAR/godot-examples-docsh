@@ -75,8 +75,8 @@ jobs:
 
       - name: Build projects and documentation
         run: |
-          echo "🏗️ Building all projects and documentation..."
-          python build_system/build.py all \
+          echo "🏗️ Building all projects and final documentation with embeds..."
+          python build_system/build.py final \
             --godot-version ${{ env.GODOT_VERSION }} \
             --jobs 4 \
             --verbose \
