@@ -144,7 +144,7 @@ jobs:
           wget -q "${TEMPLATES_URL}" -O export_templates.tpz
           
           # Create templates directory with correct structure
-          mkdir -p ~/.local/share/godot/export_templates/
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
           
           # Extract templates to temporary location first
           echo "📦 Extracting export templates..."
@@ -154,14 +154,34 @@ jobs:
           echo "Contents of temp_templates:"
           ls -la temp_templates/
           
-          # Move templates to correct location
+          # Determine source directory
           if [ -d "temp_templates/templates" ]; then
-            echo "📁 Moving templates from templates/ subdirectory..."
-            mv temp_templates/templates ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
+            TEMPLATES_SOURCE="temp_templates/templates"
+            echo "📁 Found templates in templates/ subdirectory"
           else
-            echo "📁 Moving templates directly..."
-            mv temp_templates ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}
+            TEMPLATES_SOURCE="temp_templates"
+            echo "📁 Templates are in root directory"
           fi
+          
+          # Copy templates to correct location
+          echo "📦 Installing templates to ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/"
+          
+          # For web templates, they need to stay as ZIP files
+          # Copy web template ZIP files directly
+          for web_template in ${TEMPLATES_SOURCE}/web*.zip; do
+            if [ -f "$web_template" ]; then
+              cp "$web_template" ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+              echo "📦 Copied $(basename $web_template)"
+            fi
+          done
+          
+          # For other templates, copy as-is (they might be executables or other zip files)
+          for template in ${TEMPLATES_SOURCE}/*; do
+            if [ -f "$template" ] && [[ ! "$(basename $template)" == web*.zip ]]; then
+              cp "$template" ~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/
+              echo "📦 Copied $(basename $template)"
+            fi
+          done
           
           # Check version.txt to confirm template version
           echo "🔍 Checking template version..."
@@ -188,6 +208,16 @@ jobs:
           
           echo "🔍 Searching for web templates specifically:"
           find ~/.local/share/godot/export_templates/ -name "*web*" -o -name "*html*" || echo "No web templates found"
+          
+          echo "🔍 Specifically checking for required web export ZIP files:"
+          for required_web_template in "web_nothreads_debug.zip" "web_nothreads_release.zip" "web_debug.zip" "web_release.zip"; do
+            template_path="~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/${required_web_template}"
+            if [ -f "$template_path" ]; then
+              echo "✅ Found: $required_web_template"
+            else
+              echo "❌ Missing: $required_web_template"
+            fi
+          done
 
       - name: Validate Godot export templates
         run: |
@@ -207,6 +237,41 @@ jobs:
           [rendering]
           
           renderer/rendering_method="gl_compatibility"
+          EOF
+          
+          # Create export preset
+          cat > export_presets.cfg << 'EOF'
+          [preset.0]
+          
+          name="Web"
+          platform="Web"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          export_path="test.html"
+          
+          [preset.0.options]
+          
+          custom_template/debug=""
+          custom_template/release=""
+          variant/extensions_support=false
+          vram_texture_compression/for_desktop=true
+          vram_texture_compression/for_mobile=false
+          html/export_icon=true
+          html/custom_html_shell=""
+          html/head_include=""
+          html/canvas_resize_policy=2
+          html/focus_canvas_on_start=true
+          html/experimental_virtual_keyboard=false
+          progressive_web_app/enabled=false
+          progressive_web_app/offline_page=""
+          progressive_web_app/display=1
+          progressive_web_app/orientation=0
+          progressive_web_app/icon_144x144=""
+          progressive_web_app/icon_180x180=""
+          progressive_web_app/icon_512x512=""
+          progressive_web_app/background_color=Color(0, 0, 0, 1)
           EOF
           
           # Test if Godot can list export templates

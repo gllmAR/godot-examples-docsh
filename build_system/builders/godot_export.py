@@ -24,8 +24,57 @@ def validate_export_templates(godot_binary='godot', verbose=False):
     Returns:
         bool: True if templates are valid, False otherwise
     """
+    import os
+    
     try:
-        # Test if Godot can list export templates
+        # Check if export templates exist in the file system
+        godot_version_result = subprocess.run(
+            [godot_binary, '--version'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if godot_version_result.returncode == 0 and godot_version_result.stdout:
+            version_line = godot_version_result.stdout.strip()
+            if verbose:
+                print(f"🔍 Godot version: {version_line}")
+            
+            # Extract version for template directory
+            if 'beta' in version_line:
+                template_version = version_line.split('.')[0] + '.' + version_line.split('.')[1] + '.beta' + version_line.split('beta')[1].split('.')[0]
+            else:
+                template_version = '.'.join(version_line.split('.')[:2])
+            
+            # Check for web export template ZIP files
+            template_dir = os.path.expanduser(f"~/.local/share/godot/export_templates/{template_version}")
+            required_web_templates = [
+                "web_nothreads_debug.zip",
+                "web_nothreads_release.zip"
+            ]
+            
+            if verbose:
+                print(f"🔍 Checking template directory: {template_dir}")
+            
+            if os.path.exists(template_dir):
+                for template in required_web_templates:
+                    template_path = os.path.join(template_dir, template)
+                    if os.path.exists(template_path):
+                        if verbose:
+                            print(f"✅ Found required template: {template}")
+                    else:
+                        if verbose:
+                            print(f"❌ Missing required template: {template}")
+                        return False
+                
+                if verbose:
+                    print("✅ All required web export templates found")
+                return True
+            else:
+                if verbose:
+                    print(f"❌ Template directory not found: {template_dir}")
+        
+        # Fallback: Test if Godot can list export templates
         result = subprocess.run(
             [godot_binary, '--headless', '--quit', '--list-export-templates'],
             capture_output=True,
