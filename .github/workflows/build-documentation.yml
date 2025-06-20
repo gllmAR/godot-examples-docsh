@@ -264,22 +264,23 @@ jobs:
           if [ "$(find godot-demo-projects -name index.html -path '*/exports/*' | wc -l)" -gt 0 ]; then
             echo "✅ Exports generated successfully"
             echo "Sample exports:"
-            find godot-demo-projects -name index.html -path '*/exports/*' | head -5
+            find godot-demo-projects -name index.html -path '*/exports/*' | head -5 2>/dev/null || true
             
             echo ""
             echo "🔍 Verifying export file structure:"
             # Check a few export directories for proper web export structure
-            for export_dir in $(find godot-demo-projects -name exports -type d | head -3); do
+            export_dirs=($(find godot-demo-projects -name exports -type d 2>/dev/null | head -3))
+            for export_dir in "${export_dirs[@]}"; do
               echo "  📁 $export_dir:"
               if [ -d "$export_dir/web" ]; then
                 echo "    ✅ web/ directory exists"
                 if [ -f "$export_dir/web/index.html" ]; then
                   echo "    ✅ index.html exists"
                 fi
-                if [ -f "$export_dir/web"/*.wasm ]; then
+                if ls "$export_dir/web"/*.wasm >/dev/null 2>&1; then
                   echo "    ✅ WASM files exist"
                 fi
-                if [ -f "$export_dir/web"/*.pck ]; then
+                if ls "$export_dir/web"/*.pck >/dev/null 2>&1; then
                   echo "    ✅ PCK files exist"
                 fi
               else

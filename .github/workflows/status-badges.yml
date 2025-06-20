@@ -22,6 +22,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download build artifacts
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation-site
+          path: ./build-output
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+        continue-on-error: true
+
       - name: Generate status report
         run: |
           # Get workflow status (handle both workflow_run and manual triggers)
@@ -33,7 +43,21 @@ jobs:
           
           # Count projects and exports
           PROJECT_COUNT=$(find godot-demo-projects -name "project.godot" 2>/dev/null | wc -l || echo "0")
-          EXPORT_COUNT=$(find godot-demo-projects -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
+          
+          # Check for exports in both repository and build artifacts
+          EXPORT_COUNT=0
+          if [ -d "./build-output" ]; then
+            # Count exports from downloaded artifacts
+            EXPORT_COUNT=$(find ./build-output -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
+            echo "📁 Checking exports in build artifacts: $EXPORT_COUNT found"
+          fi
+          
+          # Fallback to repository if no artifacts or no exports found
+          if [ "$EXPORT_COUNT" -eq 0 ]; then
+            EXPORT_COUNT=$(find godot-demo-projects -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
+            echo "📁 Checking exports in repository: $EXPORT_COUNT found"
+          fi
+          
           FAILED_COUNT=$((PROJECT_COUNT - EXPORT_COUNT))
           
           # Calculate build statistics

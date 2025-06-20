@@ -21,6 +21,10 @@
 1. ✅ Disabled backup workflow automatic triggers (manual dispatch only)
 2. ✅ Updated main workflow concurrency group to be unique
 3. ✅ Renamed backup workflow to indicate disabled status
+4. ✅ **Updated deprecated GitHub Actions to latest versions**:
+   - `actions/configure-pages@v3` → `v4`
+   - `actions/upload-pages-artifact@v2` → `v3`
+   - `actions/deploy-pages@v2` → `v4`
 
 ## MISSION ACCOMPLISHED! ✅
 
