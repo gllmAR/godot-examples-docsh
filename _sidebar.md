@@ -1,4 +1,4 @@
-* [🔧 Modern Build System for Godot Examples Documentation](/godot-demo-projects/build_system/)
+* [Universal Godot Build System](/godot-demo-projects/build_system/)
 * [Godot demo projects](/godot-demo-projects/)
   * [2D Demos](/godot-demo-projects/2d/)
     * [Bullet Shower](/godot-demo-projects/2d/bullet_shower/)

@@ -9,6 +9,7 @@ different repository structures and configurations.
 
 import sys
 import argparse
+import subprocess
 from pathlib import Path
 
 # Add build_system to path for imports
@@ -325,25 +326,76 @@ def main():
         
         # Perform the actual build
         if args.target in ['all', 'build', 'docs', 'final']:
-            progress.info("🎮 Building Godot projects...")
-            targets = env.ScanForProjects(config.structure.projects_dir)
+            if args.target in ['build', 'all', 'final']:
+                progress.info("🎮 Building Godot projects...")
+                targets = env.ScanForProjects(config.structure.projects_dir)
+                
+                # Filter targets if we have specific changed projects
+                if changed_projects and not args.force_rebuild:
+                    original_count = len(targets)
+                    filtered_targets = []
+                    for target in targets:
+                        project_rel = str(target.project_path.relative_to(project_root / config.structure.projects_dir))
+                        if any(project_rel.startswith(changed) for changed in changed_projects):
+                            filtered_targets.append(target)
+                    targets = filtered_targets
+                    progress.info(f"🎯 Building {len(targets)} changed projects (out of {original_count} total)")
+                
+                success = env.Build(targets)
+                
+                if not success:
+                    progress.error("❌ Some builds failed")
+                    return 1
             
-            # Filter targets if we have specific changed projects
-            if changed_projects and not args.force_rebuild:
-                original_count = len(targets)
-                filtered_targets = []
-                for target in targets:
-                    project_rel = str(target.project_path.relative_to(project_root / config.structure.projects_dir))
-                    if any(project_rel.startswith(changed) for changed in changed_projects):
-                        filtered_targets.append(target)
-                targets = filtered_targets
-                progress.info(f"🎯 Building {len(targets)} changed projects (out of {original_count} total)")
+            # Generate documentation and sidebar
+            if args.target in ['docs', 'all', 'final']:
+                progress.info("📚 Generating documentation and sidebar...")
+                
+                # Generate sidebar
+                sidebar_script = project_root / "build_system" / "builders" / "sidebar_generator.py"
+                sidebar_output = project_root / "_sidebar.md"
+                
+                result = subprocess.run([
+                    sys.executable, str(sidebar_script),
+                    '--projects-dir', str(project_root / config.structure.projects_dir),
+                    '--output', str(sidebar_output),
+                    '--verbose' if config.verbose_output else '--quiet'
+                ], capture_output=not config.verbose_output)
+                
+                if result.returncode == 0:
+                    progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
+                else:
+                    progress.warning("⚠️  Documentation generation completed with warnings")
             
-            success = env.Build(targets)
-            
-            if not success:
-                progress.error("❌ Some builds failed")
-                return 1
+            # Inject embeds for final/production builds
+            if args.target == 'final':
+                progress.info("🔗 Injecting game embeds into documentation...")
+                
+                # Add embed markers first
+                result = subprocess.run([
+                    sys.executable, str(project_root / "build_system" / "scons_build.py"),
+                    '--add-embed-markers',
+                    '--projects-dir', str(project_root / config.structure.projects_dir),
+                    '--verbose' if config.verbose_output else ''
+                ], capture_output=not config.verbose_output)
+                
+                if result.returncode == 0:
+                    progress.success("✅ Embed markers added to project READMEs")
+                    
+                    # Inject actual embeds
+                    result = subprocess.run([
+                        sys.executable, str(project_root / "build_system" / "scons_build.py"),
+                        '--inject-embeds',
+                        '--projects-dir', str(project_root / config.structure.projects_dir),
+                        '--verbose' if config.verbose_output else ''
+                    ], capture_output=not config.verbose_output)
+                    
+                    if result.returncode == 0:
+                        progress.success("✅ Game embeds injected into documentation")
+                    else:
+                        progress.warning("⚠️  Embed injection completed with warnings")
+                else:
+                    progress.warning("⚠️  Embed marker addition completed with warnings")
             
             # Post-build verification
             if not config.dry_run_mode:
