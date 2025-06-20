@@ -210,8 +210,12 @@ jobs:
           find ~/.local/share/godot/export_templates/ -name "*web*" -o -name "*html*" || echo "No web templates found"
           
           echo "🔍 Specifically checking for required web export ZIP files:"
+          echo "Template directory: $HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/"
+          echo "Files in template directory:"
+          ls -la "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/" | grep "web.*\.zip"
+          
           for required_web_template in "web_nothreads_debug.zip" "web_nothreads_release.zip" "web_debug.zip" "web_release.zip"; do
-            template_path="~/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/${required_web_template}"
+            template_path="$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATE_VERSION}/${required_web_template}"
             if [ -f "$template_path" ]; then
               echo "✅ Found: $required_web_template"
             else
