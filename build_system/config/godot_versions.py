@@ -7,6 +7,18 @@ Configuration for different Godot versions and their compatibility.
 """
 
 SUPPORTED_VERSIONS = {
+    "4.5-beta1": {
+        "stable": "4.5-beta1",
+        "template": "4.5.beta1",
+        "download_urls": {
+            "linux": "https://github.com/godotengine/godot-builds/releases/download/4.5-beta1/Godot_v4.5-beta1_linux.x86_64.zip",
+            "macos": "https://github.com/godotengine/godot-builds/releases/download/4.5-beta1/Godot_v4.5-beta1_macos.universal.zip",
+            "windows": "https://github.com/godotengine/godot-builds/releases/download/4.5-beta1/Godot_v4.5-beta1_win64.exe.zip",
+            "templates": "https://github.com/godotengine/godot-builds/releases/download/4.5-beta1/Godot_v4.5-beta1_export_templates.tpz"
+        },
+        "features": ["web_export", "headless", "c_sharp"],
+        "recommended": False
+    },
     "4.4.1": {
         "stable": "4.4.1-stable",
         "template": "4.4.1.stable",
