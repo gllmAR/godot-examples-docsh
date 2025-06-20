@@ -2,7 +2,6 @@
 
 <!-- Status Badges -->
 ![Build Status](https://github.com/gllmar/godot-examples-docsh/actions/workflows/build-documentation-universal.yml/badge.svg)
-![GitHub Pages](https://github.com/gllmar/godot-examples-docsh/actions/workflows/pages/pages-build-deployment/badge.svg)
 ![Godot 4.5-beta1](https://img.shields.io/badge/godot-4.5--beta1-blue)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
 
