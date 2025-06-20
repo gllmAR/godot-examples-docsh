@@ -3,11 +3,8 @@
 <!-- Status Badges -->
 ![Build Status](https://github.com/gllmar/godot-examples-docsh/workflows/🎮%20Build%20Godot%20Examples%20Documentation/badge.svg)
 ![GitHub Pages](https://github.com/gllmar/godot-examples-docsh/workflows/pages/pages-build-deployment/badge.svg)
-![Maintenance](https://github.com/gllmar/godot-examples-docsh/workflows/🧹%20Maintenance/badge.svg)
-![Tests](https://github.com/gllmar/godot-examples-docsh/workflows/🧪%20Test%20Pull%20Request/badge.svg)
-![Godot 4.4.1](https://img.shields.io/badge/godot-4.4.1-blue)
+![Godot 4.5-beta1](https://img.shields.io/badge/godot-4.5--beta1-blue)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
-![GitHub Actions](https://img.shields.io/badge/github--actions-v4-green)
 
 An advanced build system for generating interactive documentation from Godot demo projects. This system exports Godot projects to web format and creates comprehensive documentation with embedded playable examples.
 
@@ -48,9 +45,9 @@ cd godot-examples-docsh
 
 ## 📋 Requirements
 
-- **Godot 4.x** - For exporting projects
+- **Godot 4.5+** - For exporting projects (currently using 4.5-beta1)
 - **SCons** - Build system (`brew install scons` on macOS)
-- **Python 3.8+** - For build scripts
+- **Python 3.8+** - For build scripts (currently using 3.11)
 
 ## 🏗️ Build System
 
