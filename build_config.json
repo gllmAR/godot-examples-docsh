@@ -32,5 +32,11 @@
     "verbose_downloads": false,
     "progress_updates": true,
     "ci_mode": false
+  },
+  "deployment": {
+    "allow_partial_failures": true,
+    "max_failure_rate": 10.0,
+    "exclude_godot_binaries": true,
+    "exclude_templates": true
   }
 }

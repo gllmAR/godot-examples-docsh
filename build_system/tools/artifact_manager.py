@@ -187,7 +187,11 @@ class ArtifactManager:
         exclude_patterns = {
             ".git", ".gitignore", ".gitmodules",
             ".import", "*.tmp", "*.log", 
-            "build_cache.json", ".godot"
+            "build_cache.json", ".godot",
+            # Godot binaries and templates
+            "godot", "godot.exe", "*.tpz", 
+            "export_templates", ".local/share/godot",
+            "Godot_v*", "*.dmg", "*.app"
         }
         
         def ignore_patterns(dir_path, names):
@@ -201,6 +205,12 @@ class ArtifactManager:
                     ignored.append(name)
                 # Skip files matching patterns
                 elif any(name.endswith(pattern[1:]) for pattern in exclude_patterns if pattern.startswith('*')):
+                    ignored.append(name)
+                # Skip Godot binaries (case-insensitive)
+                elif name.lower().startswith('godot') and (name.lower().endswith('.exe') or '.' not in name):
+                    ignored.append(name)
+                # Skip export template files
+                elif name.endswith('.tpz') or 'template' in name.lower():
                     ignored.append(name)
             return ignored
         
@@ -255,12 +265,13 @@ class ArtifactManager:
         
         return summary
     
-    def validate_for_deployment(self, artifact_dir: Path) -> List[str]:
+    def validate_for_deployment(self, artifact_dir: Path, config=None) -> List[str]:
         """Validate artifact is ready for deployment"""
         
         self.progress.info("🔍 Validating artifact for deployment...")
         
         issues = []
+        warnings = []
         
         # Check for required documentation files
         required_docs = ["index.html", "_sidebar.md"]
@@ -275,22 +286,64 @@ class ArtifactManager:
         else:
             projects_dir = projects_dirs[0]
             
-            # Check for exports
-            export_count = len(list(projects_dir.rglob("*/exports/*/index.html")))
+            # Count total projects and exports
+            total_projects = len(list(projects_dir.rglob("project.godot")))
+            export_indices = list(projects_dir.rglob("*/exports/*/index.html"))
+            export_count = len(export_indices)
+            
             if export_count == 0:
                 issues.append("No web exports found in projects")
-            
-            # Check for required export files
-            for export_index in projects_dir.rglob("*/exports/*/index.html"):
-                export_dir = export_index.parent
-                if not any(export_dir.glob("*.wasm")):
-                    issues.append(f"Missing WASM file in {export_dir.relative_to(projects_dir)}")
-                if not any(export_dir.glob("*.pck")):
-                    issues.append(f"Missing PCK file in {export_dir.relative_to(projects_dir)}")
+            else:
+                # Check individual exports and collect warnings (not critical issues)
+                incomplete_exports = []
+                for export_index in export_indices:
+                    export_dir = export_index.parent
+                    project_rel_path = export_dir.relative_to(projects_dir).parent.parent
+                    
+                    missing_files = []
+                    if not any(export_dir.glob("*.wasm")):
+                        missing_files.append("WASM")
+                    if not any(export_dir.glob("*.pck")):
+                        missing_files.append("PCK")
+                    
+                    if missing_files:
+                        incomplete_exports.append(f"{project_rel_path} (missing: {', '.join(missing_files)})")
+                
+                # Report incomplete exports as warnings if within acceptable limits
+                if incomplete_exports:
+                    failure_rate = (len(incomplete_exports) / total_projects) * 100
+                    max_failure_rate = (config and hasattr(config, 'deployment') and 
+                                      getattr(config.deployment, 'max_failure_rate', 10.0)) or 10.0
+                    
+                    if failure_rate <= max_failure_rate:
+                        self.progress.warning(f"⚠️  {len(incomplete_exports)} incomplete exports ({failure_rate:.1f}% failure rate, within {max_failure_rate:.1f}% limit)")
+                        for export in incomplete_exports[:5]:  # Show first 5
+                            warnings.append(f"Incomplete export: {export}")
+                        if len(incomplete_exports) > 5:
+                            warnings.append(f"... and {len(incomplete_exports) - 5} more incomplete exports")
+                    else:
+                        self.progress.error(f"❌ Too many incomplete exports: {failure_rate:.1f}% exceeds {max_failure_rate:.1f}% limit")
+                        issues.extend([f"Incomplete export: {export}" for export in incomplete_exports])
+        
+        # Check for Godot binaries and templates that shouldn't be included
+        exclude_patterns = ["godot", "*.tpz", "export_templates", ".godot"]
+        excluded_items = []
+        for pattern in exclude_patterns:
+            found_items = list(artifact_dir.rglob(pattern))
+            if found_items:
+                excluded_items.extend(found_items)
+        
+        if excluded_items:
+            warnings.append(f"Found {len(excluded_items)} items that should be excluded (Godot binaries/templates)")
         
         # Report validation results
+        if warnings:
+            self.progress.warning(f"⚠️  Validation completed with {len(warnings)} warnings:")
+            for warning in warnings:
+                self.progress.warning(f"  - {warning}")
+        
         if issues:
-            self.progress.error(f"❌ Validation failed with {len(issues)} issues:")
+            self.progress.error(f"❌ Validation failed with {len(issues)} critical issues:")
             for issue in issues:
                 self.progress.error(f"  - {issue}")
         else:

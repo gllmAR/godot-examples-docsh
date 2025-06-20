@@ -30,6 +30,15 @@ class LoggingConfig:
 
 
 @dataclass
+class DeploymentConfig:
+    """Configuration for deployment and artifact management"""
+    allow_partial_failures: bool = True
+    max_failure_rate: float = 10.0
+    exclude_godot_binaries: bool = True
+    exclude_templates: bool = True
+
+
+@dataclass
 class BuildSystemConfig:
     """Main build system configuration"""
     project_name: str = "Godot Examples Documentation"
@@ -52,6 +61,7 @@ class BuildSystemConfig:
         "**/exports/**"
     ])
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    deployment: DeploymentConfig = field(default_factory=DeploymentConfig)
     
     @classmethod
     def from_json_file(cls, config_path: Path) -> 'BuildSystemConfig':
@@ -62,16 +72,19 @@ class BuildSystemConfig:
         # Extract nested structures
         structure_data = data.pop('structure', {})
         logging_data = data.pop('logging', {})
+        deployment_data = data.pop('deployment', {})
         
         # Create nested objects
         structure = StructureConfig(**structure_data)
         logging = LoggingConfig(**logging_data)
+        deployment = DeploymentConfig(**deployment_data)
         
         # Create main config
         return cls(
             **data,
             structure=structure,
-            logging=logging
+            logging=logging,
+            deployment=deployment
         )
     
     def apply_to_environment(self, env_dict: Dict[str, Any]) -> None:

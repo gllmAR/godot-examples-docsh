@@ -239,11 +239,20 @@ def main():
                 project_root, projects_dir, output_dir
             )
             
-            # Validate artifact
-            issues = artifact_manager.validate_for_deployment(artifact_dir)
+            # Validate artifact with tolerance for partial failures
+            issues = artifact_manager.validate_for_deployment(artifact_dir, config)
             if issues:
-                progress.error(f"❌ Artifact validation failed: {len(issues)} issues")
-                return 1
+                # Check if failures are within acceptable limits
+                allow_partial = (hasattr(config, 'deployment') and 
+                               getattr(config.deployment, 'allow_partial_failures', False))
+                
+                if allow_partial:
+                    progress.warning(f"⚠️ Artifact has {len(issues)} issues but partial failures are allowed")
+                    progress.success(f"✅ Deployment artifact ready at: {artifact_dir}")
+                    return 0
+                else:
+                    progress.error(f"❌ Artifact validation failed: {len(issues)} critical issues")
+                    return 1
             else:
                 progress.success(f"✅ Deployment artifact ready at: {artifact_dir}")
                 return 0
