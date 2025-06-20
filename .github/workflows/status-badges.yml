@@ -22,16 +22,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Download build artifacts
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: documentation-site
-          path: ./build-output
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-        continue-on-error: true
-
       - name: Generate status report
         run: |
           # Get workflow status (handle both workflow_run and manual triggers)
@@ -44,27 +34,14 @@ jobs:
           # Count projects and exports
           PROJECT_COUNT=$(find godot-demo-projects -name "project.godot" 2>/dev/null | wc -l || echo "0")
           
-          # Check for exports in both repository and build artifacts
-          EXPORT_COUNT=0
-          if [ -d "./build-output" ]; then
-            # Count exports from downloaded artifacts
-            EXPORT_COUNT=$(find ./build-output -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
-            echo "📁 Checking exports in build artifacts: $EXPORT_COUNT found"
-          fi
-          
-          # Fallback to repository if no artifacts or no exports found
-          if [ "$EXPORT_COUNT" -eq 0 ]; then
-            EXPORT_COUNT=$(find godot-demo-projects -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
-            echo "📁 Checking exports in repository: $EXPORT_COUNT found"
-          fi
-          
-          FAILED_COUNT=$((PROJECT_COUNT - EXPORT_COUNT))
-          
-          # Calculate build statistics
-          if [ "$PROJECT_COUNT" -gt 0 ]; then
-            SUCCESS_RATE=$(echo "scale=1; $EXPORT_COUNT * 100 / $PROJECT_COUNT" | bc -l 2>/dev/null || echo "0")
+          # Check if the deployed site is accessible (no artifacts needed)
+          SITE_URL="https://gllmar.github.io/godot-examples-docsh/"
+          if curl -s --head "$SITE_URL" | head -n 1 | grep -q "200 OK"; then
+            SITE_STATUS="online"
+            echo "🌐 Site is accessible: $SITE_URL"
           else
-            SUCCESS_RATE="0"
+            SITE_STATUS="offline"
+            echo "🌐 Site is not accessible: $SITE_URL"
           fi
           
           # Display status report
@@ -72,30 +49,27 @@ jobs:
           echo "=============================================="
           echo ""
           echo "📊 Build Status: $WORKFLOW_STATUS"
-          echo "� Total targets: $PROJECT_COUNT"
-          echo "✅ Successful: $EXPORT_COUNT"
-          echo "❌ Failed: $FAILED_COUNT"
-          echo "📈 Success rate: ${SUCCESS_RATE}%"
-          echo "� Godot Version: 4.3"
+          echo "🎯 Total Projects: $PROJECT_COUNT"
+          echo "🌐 Site Status: $SITE_STATUS"
+          echo "� Site URL: $SITE_URL"
           echo ""
           
           # Generate badge URLs (for display/reference)
           echo "🏷️  Badge URLs:"
           echo "Build Status: https://img.shields.io/badge/build-$(echo $WORKFLOW_STATUS | tr '[:upper:]' '[:lower:]')-$([ "$WORKFLOW_STATUS" = "success" ] && echo "brightgreen" || echo "red")"
           echo "Total Projects: https://img.shields.io/badge/projects-$PROJECT_COUNT-blue"
-          echo "Successful: https://img.shields.io/badge/successful-$EXPORT_COUNT-brightgreen"
-          echo "Failed: https://img.shields.io/badge/failed-$FAILED_COUNT-$([ "$FAILED_COUNT" -eq 0 ] && echo "brightgreen" || echo "red")"
-          echo "Success Rate: https://img.shields.io/badge/success--rate-${SUCCESS_RATE}%25-$([ "$FAILED_COUNT" -eq 0 ] && echo "brightgreen" || [ "${SUCCESS_RATE%.*}" -ge 90 ] && echo "green" || [ "${SUCCESS_RATE%.*}" -ge 75 ] && echo "yellow" || echo "orange")"
-          echo "Godot Version: https://img.shields.io/badge/godot-4.3-blue"
+          echo "Site Status: https://img.shields.io/badge/site-$(echo $SITE_STATUS | tr '[:upper:]' '[:lower:]')-$([ "$SITE_STATUS" = "online" ] && echo "brightgreen" || echo "red")"
           echo ""
           
           # Status summary
-          if [ "$WORKFLOW_STATUS" = "success" ]; then
-            echo "✅ Build completed successfully!"
-          elif [ "$WORKFLOW_STATUS" = "failure" ]; then
-            echo "❌ Build failed!"
+          if [ "$WORKFLOW_STATUS" = "success" ] && [ "$SITE_STATUS" = "online" ]; then
+            echo "✅ System healthy: Build successful and site accessible!"
+          elif [ "$WORKFLOW_STATUS" = "success" ]; then
+            echo "⚠️  Build successful but site may not be accessible"
+          elif [ "$SITE_STATUS" = "online" ]; then
+            echo "⚠️  Site accessible but last build may have failed"
           else
-            echo "⚠️  Build status unknown"
+            echo "❌ System issues: Build and/or site problems detected"
           fi
           
           if [ "$PROJECT_COUNT" -gt 0 ]; then
@@ -104,14 +78,7 @@ jobs:
             echo "❌ No projects found (submodule issue?)"
           fi
           
-          if [ "$EXPORT_COUNT" -gt 0 ]; then
-            echo "✅ Successfully exported $EXPORT_COUNT projects"
-          else
-            echo "❌ No exports generated"
-          fi
-          
-          if [ "$FAILED_COUNT" -gt 0 ]; then
-            echo "⚠️  $FAILED_COUNT projects failed to export"
-          else
-            echo "🎉 All projects exported successfully!"
+          echo ""
+          echo "🔍 For detailed build information, check the workflow run at:"
+          echo "   https://github.com/${{ github.repository }}/actions"
           fi
