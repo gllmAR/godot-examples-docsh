@@ -29,15 +29,16 @@ env/
 .env
 
 # ===========================================
-# BUILD SYSTEM & CI/CD ARTIFACTS
+# BUILD SYSTEM & CI/CD ARTIFACTS  
 # ===========================================
 # Build System Cache and Artifacts
-.scons_cache/
-.sconsign.dblite
-build_cache.json
 .build_cache/
 build_artifacts/
 *.build_cache
+
+# Legacy SCons files (kept for backward compatibility)
+.scons_cache/
+.sconsign.dblite
 
 # Build system configuration (keep only the default)
 # build_config.json should be committed for the main project

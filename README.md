@@ -121,8 +121,8 @@ The build system consists of specialized modules in `build_system/`:
 
 #### Core System
 - **`build.py`** - Universal entry point and orchestration
-- **`config/`** - Configuration management and validation
-- **`scons_build.py`** - Legacy SCons integration (embed injection)
+- **`modern_build_env.py`** - Modern build environment management
+- **`project_config.py`** - Project configuration and validation
 
 #### Specialized Tools
 - **`tools/environment_manager.py`** - Godot installation and templates

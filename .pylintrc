@@ -1,4 +1,16 @@
 [MESSAGES CONTROL]
+# General pylint configuration for the project
+disable=
+    import-error,
+    undefined-variable
+
+[BASIC]
+# Allow common build system variable names
+good-names=env,i,j,k,x,y,z,config,args
+
+[DESIGN]
+# Build scripts often have many statements at module level
+max-statements=50]
 # Disable warnings for SCons-specific modules that Pylance can't resolve
 disable=
     import-error,

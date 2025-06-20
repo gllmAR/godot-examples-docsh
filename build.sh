@@ -110,7 +110,7 @@ clean_build() {
 }
 
 # Parse arguments
-SCONS_ARGS=()
+PYTHON_ARGS=()
 BUILD_TARGET=""
 CLEAN_BUILD=false
 CHECK_DEPS_ONLY=false
@@ -136,37 +136,34 @@ while [[ $# -gt 0 ]]; do
             ;;
         --clean)
             CLEAN_BUILD=true
+            PYTHON_ARGS+=("--clean")
             shift
             ;;
         --preview)
-            SCONS_ARGS+=("--preview")
+            PYTHON_ARGS+=("--preview")
             shift
             ;;
         --progress)
-            SCONS_ARGS+=("--progress")
+            PYTHON_ARGS+=("--progress")
             shift
             ;;
         --verbose|-v)
-            SCONS_ARGS+=("verbose=1")
+            PYTHON_ARGS+=("--verbose")
             shift
             ;;
         --jobs|-j)
-            SCONS_ARGS+=("-j$2")
-            shift 2
-            ;;
-        --godot-binary)
-            SCONS_ARGS+=("--godot-binary=$2")
+            PYTHON_ARGS+=("--jobs" "$2")
             shift 2
             ;;
         --godot-version)
-            SCONS_ARGS+=("--godot-version=$2")
+            PYTHON_ARGS+=("--godot-version" "$2")
             shift 2
             ;;
-        --build-mode)
-            SCONS_ARGS+=("--build-mode=$2")
-            shift 2
+        --dry-run)
+            PYTHON_ARGS+=("--dry-run")
+            shift
             ;;
-        build|docs|final|add-markers|inject-embeds|all)
+        build|docs|final|all|setup|verify|artifact)
             BUILD_TARGET="$1"
             shift
             ;;
@@ -180,7 +177,9 @@ done
 
 # Add build target if specified
 if [[ -n "$BUILD_TARGET" ]]; then
-    SCONS_ARGS+=("$BUILD_TARGET")
+    PYTHON_ARGS+=("$BUILD_TARGET")
+else
+    PYTHON_ARGS+=("all")
 fi
 
 # Print header
@@ -214,46 +213,6 @@ elif [[ "$SKIP_DEPS" != true ]]; then
         fi
     fi
     echo ""
-fi
-
-# Convert bash arguments to Python arguments for the new build system
-PYTHON_ARGS=()
-
-# Add target
-if [[ -n "$BUILD_TARGET" ]]; then
-    PYTHON_ARGS+=("$BUILD_TARGET")
-else
-    PYTHON_ARGS+=("all")
-fi
-
-# Convert common flags
-if [[ "$CLEAN_BUILD" == true ]]; then
-    PYTHON_ARGS+=("--clean")
-fi
-
-if [[ "$PREVIEW_ONLY" == true ]]; then
-    PYTHON_ARGS+=("--preview")
-fi
-
-if [[ "$SHOW_PROGRESS" == true ]]; then
-    PYTHON_ARGS+=("--progress")
-fi
-
-if [[ "$VERBOSE_BUILD" == true ]]; then
-    PYTHON_ARGS+=("--verbose")
-fi
-
-if [[ -n "$NUM_JOBS" ]]; then
-    PYTHON_ARGS+=("--jobs" "$NUM_JOBS")
-fi
-
-if [[ -n "$GODOT_BINARY" ]]; then
-    # Extract just the version from the binary path if it contains version info
-    PYTHON_ARGS+=("--godot-binary" "$GODOT_BINARY")
-fi
-
-if [[ -n "$GODOT_VERSION" ]]; then
-    PYTHON_ARGS+=("--godot-version" "$GODOT_VERSION")
 fi
 
 # Print build info

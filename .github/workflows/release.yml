@@ -58,12 +58,13 @@ jobs:
         run: |
           echo "🏗️ Building all Godot projects for release..."
           
-          python build_system/scons_build.py \
+          python build_system/build.py \
             --projects-dir godot-demo-projects \
-            --godot-binary godot \
+            --godot-version 4.3 \
             --jobs 4 \
             --force-rebuild \
-            --verbose
+            --verbose \
+            all
 
       - name: Generate comprehensive documentation
         run: |
