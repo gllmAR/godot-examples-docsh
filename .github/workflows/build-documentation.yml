@@ -113,21 +113,30 @@ jobs:
         run: |
           echo "🎮 Setting up Godot Engine ${GODOT_VERSION}..."
           
-          # Download Godot for Linux
-          GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
-          TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_export_templates.tpz"
+          # Construct URLs based on version type
+          if [[ "${GODOT_VERSION}" == *"beta"* ]] || [[ "${GODOT_VERSION}" == *"alpha"* ]] || [[ "${GODOT_VERSION}" == *"rc"* ]]; then
+            # For pre-release versions, use the exact tag name
+            GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+            TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          else
+            # For stable versions, use the standard pattern
+            GODOT_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_linux.x86_64.zip"
+            TEMPLATES_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION_STABLE}/Godot_v${GODOT_VERSION_STABLE}_export_templates.tpz"
+          fi
           
           echo "📥 Downloading Godot ${GODOT_VERSION}..."
+          echo "🔗 URL: ${GODOT_URL}"
           wget -q "${GODOT_URL}" -O godot.zip
           
           echo "📦 Extracting Godot..."
           unzip -q godot.zip
           
           # Make Godot executable and move to a standard location
-          chmod +x Godot_v${GODOT_VERSION_STABLE}_linux.x86_64
-          sudo mv Godot_v${GODOT_VERSION_STABLE}_linux.x86_64 /usr/local/bin/godot
+          chmod +x Godot_v${GODOT_VERSION}_linux.x86_64
+          sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
           
           echo "📥 Downloading export templates..."
+          echo "🔗 Templates URL: ${TEMPLATES_URL}"
           wget -q "${TEMPLATES_URL}" -O export_templates.tpz
           
           echo "📦 Installing export templates..."
