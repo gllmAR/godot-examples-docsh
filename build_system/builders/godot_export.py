@@ -13,6 +13,49 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
+def validate_export_templates(godot_binary='godot', verbose=False):
+    """
+    Validate that Godot can find export templates
+    
+    Args:
+        godot_binary: Path to Godot executable
+        verbose: Enable verbose output
+    
+    Returns:
+        bool: True if templates are valid, False otherwise
+    """
+    try:
+        # Test if Godot can list export templates
+        result = subprocess.run(
+            [godot_binary, '--headless', '--quit', '--list-export-templates'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if verbose:
+            print(f"🔍 Template validation output:")
+            print(f"   Return code: {result.returncode}")
+            if result.stdout:
+                print(f"   Stdout: {result.stdout}")
+            if result.stderr:
+                print(f"   Stderr: {result.stderr}")
+        
+        # Look for Web export in the output
+        if result.stdout and 'Web' in result.stdout:
+            if verbose:
+                print("✅ Web export templates found and available")
+            return True
+        elif verbose:
+            print("⚠️ Web export templates not found in template list")
+            
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+        if verbose:
+            print(f"❌ Template validation failed: {e}")
+    
+    return False
+
+
 def godot_export_builder(target, source, env):
     """
     SCons builder function for exporting Godot projects
@@ -45,6 +88,12 @@ def godot_export_builder(target, source, env):
         print(f"🔄 Exporting Godot project: {project_dir.name}")
         print(f"   Source: {project_file}")
         print(f"   Target: {export_file}")
+    
+    # Validate export templates before attempting export
+    if not validate_export_templates(godot_binary, verbose):
+        print(f"❌ Export templates validation failed for {project_dir.name}")
+        print("   Make sure Godot export templates are properly installed")
+        return 1
     
     try:
         # Build Godot export command

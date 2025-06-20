@@ -1,0 +1,93 @@
+name: 📊 Status Report
+
+# Cancel in-progress status reports when a new one is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_run:
+    workflows: ["🎮 Build Godot Examples Documentation"]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  status-report:
+    name: 📊 Status Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate status report
+        run: |
+          # Get workflow status (handle both workflow_run and manual triggers)
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            WORKFLOW_STATUS="${{ github.event.workflow_run.conclusion }}"
+          else
+            WORKFLOW_STATUS="success"
+          fi
+          
+          # Count projects and exports
+          PROJECT_COUNT=$(find godot-demo-projects -name "project.godot" 2>/dev/null | wc -l || echo "0")
+          EXPORT_COUNT=$(find godot-demo-projects -name "index.html" -path "*/exports/*" 2>/dev/null | wc -l || echo "0")
+          FAILED_COUNT=$((PROJECT_COUNT - EXPORT_COUNT))
+          
+          # Calculate build statistics
+          if [ "$PROJECT_COUNT" -gt 0 ]; then
+            SUCCESS_RATE=$(echo "scale=1; $EXPORT_COUNT * 100 / $PROJECT_COUNT" | bc -l 2>/dev/null || echo "0")
+          else
+            SUCCESS_RATE="0"
+          fi
+          
+          # Display status report
+          echo "🎮 Godot Examples Documentation Status Report"
+          echo "=============================================="
+          echo ""
+          echo "📊 Build Status: $WORKFLOW_STATUS"
+          echo "� Total targets: $PROJECT_COUNT"
+          echo "✅ Successful: $EXPORT_COUNT"
+          echo "❌ Failed: $FAILED_COUNT"
+          echo "📈 Success rate: ${SUCCESS_RATE}%"
+          echo "� Godot Version: 4.3"
+          echo ""
+          
+          # Generate badge URLs (for display/reference)
+          echo "🏷️  Badge URLs:"
+          echo "Build Status: https://img.shields.io/badge/build-$(echo $WORKFLOW_STATUS | tr '[:upper:]' '[:lower:]')-$([ "$WORKFLOW_STATUS" = "success" ] && echo "brightgreen" || echo "red")"
+          echo "Total Projects: https://img.shields.io/badge/projects-$PROJECT_COUNT-blue"
+          echo "Successful: https://img.shields.io/badge/successful-$EXPORT_COUNT-brightgreen"
+          echo "Failed: https://img.shields.io/badge/failed-$FAILED_COUNT-$([ "$FAILED_COUNT" -eq 0 ] && echo "brightgreen" || echo "red")"
+          echo "Success Rate: https://img.shields.io/badge/success--rate-${SUCCESS_RATE}%25-$([ "$FAILED_COUNT" -eq 0 ] && echo "brightgreen" || [ "${SUCCESS_RATE%.*}" -ge 90 ] && echo "green" || [ "${SUCCESS_RATE%.*}" -ge 75 ] && echo "yellow" || echo "orange")"
+          echo "Godot Version: https://img.shields.io/badge/godot-4.3-blue"
+          echo ""
+          
+          # Status summary
+          if [ "$WORKFLOW_STATUS" = "success" ]; then
+            echo "✅ Build completed successfully!"
+          elif [ "$WORKFLOW_STATUS" = "failure" ]; then
+            echo "❌ Build failed!"
+          else
+            echo "⚠️  Build status unknown"
+          fi
+          
+          if [ "$PROJECT_COUNT" -gt 0 ]; then
+            echo "✅ Found $PROJECT_COUNT projects"
+          else
+            echo "❌ No projects found (submodule issue?)"
+          fi
+          
+          if [ "$EXPORT_COUNT" -gt 0 ]; then
+            echo "✅ Successfully exported $EXPORT_COUNT projects"
+          else
+            echo "❌ No exports generated"
+          fi
+          
+          if [ "$FAILED_COUNT" -gt 0 ]; then
+            echo "⚠️  $FAILED_COUNT projects failed to export"
+          else
+            echo "🎉 All projects exported successfully!"
+          fi
