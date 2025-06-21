@@ -53,6 +53,9 @@ def _lazy_import(module_name: str, class_name: Optional[str] = None):
         elif module_name == 'embed_injector':
             from tools.embed_injector import inject_embeds
             _lazy_imports[module_name] = inject_embeds
+        elif module_name == 'diagnostics':
+            from tools.diagnostics import run_diagnostics
+            _lazy_imports[module_name] = run_diagnostics
     
     if class_name and isinstance(_lazy_imports[module_name], dict):
         return _lazy_imports[module_name][class_name]
@@ -73,6 +76,7 @@ Examples:
   %(prog)s build                    # Build exports only
   %(prog)s docs                     # Generate docs only
   %(prog)s final                    # Build with embeds (production)
+  %(prog)s check                    # Run system diagnostics and health check
   %(prog)s build --jobs 8           # Use 8 parallel jobs for building
   %(prog)s build --jobs 0           # Use all available CPU cores
   %(prog)s final --verbose --jobs 0 # Full build with maximum parallelism
@@ -107,7 +111,7 @@ Examples:
         'target',
         nargs='?',
         default='all',
-        choices=['all', 'build', 'docs', 'final', 'clean', 'setup', 'verify', 'artifact'],
+        choices=['all', 'build', 'docs', 'final', 'clean', 'setup', 'verify', 'artifact', 'check'],
         help='Build target (default: all)'
     )
     
@@ -263,6 +267,13 @@ def main():
                     status_icon = "✅" if status else "❌"
                     progress.info(f"  {status_icon} {component.replace('_', ' ').title()}")
                 return 1
+        
+        # Handle system diagnostics
+        if args.target == 'check':
+            progress.info("🩺 Running build system diagnostics...")
+            run_diagnostics = _lazy_import('diagnostics')
+            success = run_diagnostics(project_root, progress)
+            return 0 if success else 1
         
         # Handle artifact preparation
         if args.target == 'artifact' or args.prepare_artifact:
