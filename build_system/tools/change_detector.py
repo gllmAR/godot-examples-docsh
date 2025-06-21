@@ -62,6 +62,52 @@ class ChangeDetector:
             )
         
         try:
+            # First, check if the base_ref exists
+            ref_check = subprocess.run(
+                ["git", "rev-parse", "--verify", base_ref],
+                cwd=repo_dir,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if ref_check.returncode != 0:
+                self.progress.warning(f"⚠️  Reference '{base_ref}' not found, using fallback strategy")
+                # Try to use the first commit or current state
+                try:
+                    # Get first commit hash
+                    first_commit = subprocess.run(
+                        ["git", "rev-list", "--max-parents=0", "HEAD"],
+                        cwd=repo_dir,
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    if first_commit.returncode == 0 and first_commit.stdout.strip():
+                        base_ref = first_commit.stdout.strip()
+                        self.progress.info(f"🔄 Using first commit as base: {base_ref[:8]}")
+                    else:
+                        # No commits or git history, force full rebuild
+                        self.progress.info("🔄 No git history found, forcing full rebuild")
+                        return ChangeInfo(
+                            changed_files=[],
+                            changed_projects=set(),
+                            build_system_changed=True,
+                            docs_changed=True,
+                            force_rebuild=True,
+                            reason="No git history - first build"
+                        )
+                except:
+                    # Git operations failed, fall back to full rebuild
+                    return ChangeInfo(
+                        changed_files=[],
+                        changed_projects=set(),
+                        build_system_changed=True,
+                        docs_changed=True,
+                        force_rebuild=True,
+                        reason="Git operations failed - assuming all changed"
+                    )
+            
             # Get changed files since base_ref
             result = subprocess.run(
                 ["git", "diff", "--name-only", base_ref, "HEAD"],

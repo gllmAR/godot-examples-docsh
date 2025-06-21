@@ -159,12 +159,20 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         try:
             self.progress.info(f"🎮 Exporting {project_path.name} to web...")
             
+            # Add environment variables for better stability
+            env = os.environ.copy()
+            env.update({
+                'GODOT_DISABLE_CRASH_HANDLER': '1',  # Disable crash handler for better error reporting
+                'DISPLAY': ':0' if 'DISPLAY' not in env else env['DISPLAY'],  # Ensure display is set
+            })
+            
             result = subprocess.run(
                 export_cmd,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
-                cwd=project_path
+                cwd=project_path,
+                env=env
             )
             
             export_time = time.time() - start_time
@@ -181,7 +189,9 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
                     export_time=export_time
                 )
             else:
-                error_msg = f"Export failed (code {result.returncode}): {result.stderr}"
+                # Enhanced error analysis
+                error_details = self._analyze_export_error(result.returncode, result.stderr, result.stdout)
+                error_msg = f"Export failed (code {result.returncode}): {error_details}"
                 self.progress.error(f"❌ Failed to export {project_path.name}: {error_msg}")
                 
                 return ExportResult(
@@ -212,6 +222,44 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
                 error_message=error_msg
             )
     
+    def export_project_with_retry(self, project_path: Path, max_retries: int = 2, force_rebuild: bool = False) -> ExportResult:
+        """Export a project with retry logic for handling system errors"""
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            if attempt > 0:
+                self.progress.info(f"🔄 Retry {attempt}/{max_retries} for {project_path.name}")
+                # Wait a bit before retry to let system recover
+                import time
+                time.sleep(1 + attempt)
+            
+            result = self.export_project_to_web(project_path, force_rebuild)
+            
+            if result.success:
+                return result
+            
+            last_error = result.error_message
+            
+            # Check if this is a retryable error
+            if result.error_message and any(err in result.error_message.lower() for err in [
+                'invalid argument', 'system_error', 'std::system_error', 'resource temporarily unavailable'
+            ]):
+                if attempt < max_retries:
+                    self.progress.warning(f"⚠️ Retryable error for {project_path.name}, attempting retry...")
+                    continue
+            else:
+                # Non-retryable error, fail immediately
+                break
+        
+        # All retries failed, return the last error
+        self.progress.error(f"❌ All retry attempts failed for {project_path.name}")
+        return ExportResult(
+            success=False,
+            project_path=project_path,
+            export_path=Path(),
+            error_message=f"Failed after {max_retries + 1} attempts: {last_error}"
+        )
+    
     def export_projects_parallel(self, project_files: List[Path], max_workers: int = 4, force_rebuild: bool = False) -> List[ExportResult]:
         """Export multiple projects in parallel"""
         import time
@@ -223,9 +271,9 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         batch_size = min(max_workers, len(project_files))
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
-            # Submit all export tasks
+            # Submit all export tasks with retry capability
             future_to_project = {
-                executor.submit(self.export_project_to_web, project_file.parent, force_rebuild): project_file
+                executor.submit(self.export_project_with_retry, project_file.parent, 2, force_rebuild): project_file
                 for project_file in project_files
             }
             
@@ -297,6 +345,42 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
             "average_export_time": avg_time,
             "failed_projects": [r.project_path.name for r in failed]
         }
+    
+    def _analyze_export_error(self, returncode: int, stderr: str, stdout: str) -> str:
+        """Analyze Godot export error and provide helpful diagnostics"""
+        # Common error patterns and solutions
+        error_patterns = {
+            -6: "System resource error - try reducing parallel jobs or check memory",
+            -9: "Process killed - likely out of memory or timeout",
+            -11: "Segmentation fault - corrupted project or missing dependencies",
+            1: "Export template or preset issue",
+            2: "Project file or path issue",
+            127: "Godot binary not found or not executable"
+        }
+        
+        # Get base error description
+        base_error = error_patterns.get(returncode, f"Unknown error code {returncode}")
+        
+        # Analyze stderr for specific issues
+        if stderr:
+            stderr_lower = stderr.lower()
+            if "invalid argument" in stderr_lower:
+                base_error += " - Check file paths and permissions"
+            elif "cannot allocate memory" in stderr_lower or "out of memory" in stderr_lower:
+                base_error += " - Insufficient memory, reduce parallel jobs"
+            elif "template" in stderr_lower and "not found" in stderr_lower:
+                base_error += " - Export templates missing, run setup"
+            elif "permission denied" in stderr_lower:
+                base_error += " - Permission error, check file/directory permissions"
+            elif "display" in stderr_lower or "x11" in stderr_lower:
+                base_error += " - Display/X11 issue in headless environment"
+        
+        # Include relevant stderr excerpt
+        if stderr and len(stderr.strip()) > 0:
+            stderr_excerpt = stderr.strip()[:200] + ("..." if len(stderr) > 200 else "")
+            return f"{base_error}\nDetails: {stderr_excerpt}"
+        
+        return base_error
 
 
 def create_fallback_export(project_path: Path, export_dir: Path) -> bool:
