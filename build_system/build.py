@@ -10,6 +10,8 @@ different repository structures and configurations.
 import sys
 import argparse
 import subprocess
+import shutil
+import traceback
 from pathlib import Path
 
 # Add build_system to path for imports
@@ -504,33 +506,68 @@ def main():
                 if args.dry_run:
                     progress.info("🔍 Would inject game embeds into documentation")
                 else:
-                    # Basic embed injection - add placeholder embeds to README files
-                    projects_dir = project_root / config.structure.projects_dir
-                    project_files = list(projects_dir.rglob("project.godot"))
-                    
-                    for project_file in project_files:
-                        project_dir = project_file.parent
-                        readme_file = project_dir / "README.md"
+                    # Use the embed injector tool
+                    try:
+                        from tools.embed_injector import inject_embeds
                         
-                        if readme_file.exists():
-                            content = readme_file.read_text()
+                        projects_dir = project_root / config.structure.projects_dir
+                        stats, errors = inject_embeds(
+                            projects_dir, dry_run=False, verbose=args.verbose
+                        )
+                        
+                        if errors:
+                            progress.warning(f"⚠️ Embed injection completed with {len(errors)} warnings:")
+                            for error in errors[:3]:  # Show first 3 errors
+                                progress.warning(f"   - {error}")
+                            if len(errors) > 3:
+                                progress.warning(f"   ... and {len(errors) - 3} more")
+                        
+                        progress.success(f"✅ Game embeds injected: {stats['files_processed']} files processed")
+                        if args.verbose:
+                            progress.info(f"   - Embeds added: {stats['embeds_added']}")
+                            progress.info(f"   - Old embeds removed: {stats['old_embeds_removed']}")
+                        
+                    except ImportError:
+                        # Fallback to basic embed injection
+                        progress.warning("⚠️ Using fallback embed injection")
+                        
+                        projects_dir = project_root / config.structure.projects_dir
+                        project_files = list(projects_dir.rglob("project.godot"))
+                        
+                        embed_marker = "<!-- embed-{$PATH} -->"
+                        
+                        for project_file in project_files:
+                            project_dir = project_file.parent
+                            readme_file = project_dir / "README.md"
                             
-                            # Add embed placeholder if not already present
-                            embed_marker = "<!-- GAME_EMBED -->"
-                            if embed_marker not in content:
-                                embed_html = f"""
-{embed_marker}
-<div class="game-embed">
-    <iframe src="./exports/index.html" width="800" height="600" frameborder="0">
-        <p>Your browser does not support iframes. <a href="./exports/index.html">Click here to play the game</a>.</p>
-    </iframe>
-</div>
-<!-- /GAME_EMBED -->
-"""
-                                content = content + "\n" + embed_html
-                                readme_file.write_text(content)
-                    
-                    progress.success("✅ Game embeds injected into documentation")
+                            if readme_file.exists():
+                                content = readme_file.read_text()
+                                
+                                # Add new embed marker after H1 title if not already present
+                                if embed_marker not in content:
+                                    lines = content.split('\n')
+                                    insert_pos = 0
+                                    
+                                    # Find the first H1 title
+                                    for i, line in enumerate(lines):
+                                        if line.strip().startswith('# '):
+                                            insert_pos = i + 1
+                                            break
+                                    
+                                    # Insert embed marker after title (with empty line)
+                                    if insert_pos > 0:
+                                        lines.insert(insert_pos, "")
+                                        lines.insert(insert_pos + 1, embed_marker)
+                                        lines.insert(insert_pos + 2, "")
+                                    else:
+                                        # If no H1 found, add at the beginning
+                                        lines.insert(0, embed_marker)
+                                        lines.insert(1, "")
+                                    
+                                    content = '\n'.join(lines)
+                                    readme_file.write_text(content)
+                        
+                        progress.success("✅ Game embeds injected into documentation")
             
             # Post-build verification
             if not config.dry_run_mode:
