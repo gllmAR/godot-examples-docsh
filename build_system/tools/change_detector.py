@@ -61,6 +61,23 @@ class ChangeDetector:
                 reason="Force rebuild requested"
             )
         
+        # Check for CI environment - force rebuild in CI to ensure fresh builds
+        # This is critical for CI/CD pipelines that use shallow clones (fetch-depth: 1)
+        # where change detection may fail due to limited git history
+        ci_indicators = ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'TRAVIS', 'CIRCLECI', 'JENKINS_URL']
+        is_ci = any(os.environ.get(var) for var in ci_indicators)
+        
+        if is_ci:
+            self.progress.info("🤖 CI environment detected - forcing full rebuild for reliable deployment")
+            return ChangeInfo(
+                changed_files=[],
+                changed_projects=set(),
+                build_system_changed=True,
+                docs_changed=True,
+                force_rebuild=True,
+                reason="CI environment detected - ensuring fresh build"
+            )
+        
         try:
             # First, check if the base_ref exists
             ref_check = subprocess.run(
@@ -130,6 +147,30 @@ class ChangeDetector:
                 )
             
             changed_files = result.stdout.strip().split('\n') if result.stdout.strip() else []
+            
+            # Special case: If we're comparing the same commit (shallow clone scenario)
+            # and no changes detected, but we used a fallback strategy, force rebuild
+            # This handles edge cases where CI detection might be missed but we're still
+            # in a shallow clone situation that needs a full build
+            if not changed_files and base_ref != "HEAD~1":
+                # Check if base_ref equals HEAD (indicating shallow clone)
+                head_check = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=repo_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if head_check.returncode == 0 and head_check.stdout.strip() == base_ref:
+                    self.progress.info("🔄 Shallow clone detected - forcing full rebuild")
+                    return ChangeInfo(
+                        changed_files=[],
+                        changed_projects=set(),
+                        build_system_changed=True,
+                        docs_changed=True,
+                        force_rebuild=True,
+                        reason="Shallow clone detected - first build"
+                    )
             
             # Analyze changes
             return self._analyze_changes(changed_files, repo_dir)
