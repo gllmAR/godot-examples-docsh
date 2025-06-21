@@ -435,69 +435,32 @@ def main():
             if args.target in ['docs', 'all', 'final']:
                 progress.info("📚 Generating documentation and sidebar...")
                 
-                # Use improved sidebar generation
-                sidebar_output = project_root / "_sidebar.md"
-                projects_dir = project_root / config.structure.projects_dir
-                
                 if args.dry_run:
-                    progress.info(f"🔍 Would generate sidebar: {sidebar_output}")
+                    progress.info("🔍 Would generate sidebar and documentation")
                 else:
-                    # Import and use improved sidebar generator
+                    # Use the sidebar generator tool
                     try:
                         from tools.sidebar_generator import generate_sidebar
                         
+                        projects_dir = project_root / config.structure.projects_dir
                         sidebar_content, errors = generate_sidebar(
                             projects_dir, config, validate=True, verbose=args.verbose
                         )
                         
                         if errors:
-                            progress.warning(f"⚠️  Sidebar generated with {len(errors)} warnings:")
+                            progress.warning(f"⚠️ Sidebar generated with {len(errors)} warnings:")
                             for error in errors[:3]:  # Show first 3 errors
                                 progress.warning(f"   - {error}")
                             if len(errors) > 3:
                                 progress.warning(f"   ... and {len(errors) - 3} more")
                         
+                        sidebar_output = project_root / "_sidebar.md"
                         sidebar_output.write_text(sidebar_content)
                         progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
                         
-                    except ImportError:
-                        # Fallback to basic generation if improved generator not available
-                        progress.warning("⚠️  Using fallback sidebar generation")
-                        
-                        # Generate basic sidebar content (without title for Docsify compatibility)
-                        sidebar_content = ""
-                        
-                        # Find all projects and create sidebar entries
-                        project_files = list(projects_dir.rglob("project.godot"))
-                        
-                        if project_files:
-                            # Group by category (subdirectory)
-                            categories = {}
-                            for project_file in project_files:
-                                project_dir = project_file.parent
-                                relative_path = project_dir.relative_to(projects_dir)
-                                
-                                # Get category (first level directory)
-                                parts = relative_path.parts
-                                if parts and len(parts) > 0:
-                                    category = parts[0]
-                                    project_name = parts[-1] if len(parts) > 1 else parts[0]
-                                    
-                                    if category not in categories:
-                                        categories[category] = []
-                                    categories[category].append((project_name, relative_path))
-                            
-                            # Build sidebar content in Docsify format
-                            for category, projects in sorted(categories.items()):
-                                sidebar_content += f"- {category.upper()}\n\n"
-                                for project_name, path in sorted(projects):
-                                    sidebar_content += f"  - [{project_name}](/{config.structure.projects_dir}/{path}/README.md)\n"
-                                sidebar_content += "\n"
-                        else:
-                            sidebar_content += "No projects found.\n"
-                        
-                        sidebar_output.write_text(sidebar_content)
-                        progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
+                    except ImportError as e:
+                        progress.error(f"❌ Failed to import sidebar generator: {e}")
+                        return 1
             
             # Inject embeds for final/production builds
             if args.target == 'final':
@@ -527,47 +490,9 @@ def main():
                             progress.info(f"   - Embeds added: {stats['embeds_added']}")
                             progress.info(f"   - Old embeds removed: {stats['old_embeds_removed']}")
                         
-                    except ImportError:
-                        # Fallback to basic embed injection
-                        progress.warning("⚠️ Using fallback embed injection")
-                        
-                        projects_dir = project_root / config.structure.projects_dir
-                        project_files = list(projects_dir.rglob("project.godot"))
-                        
-                        embed_marker = "<!-- embed-{$PATH} -->"
-                        
-                        for project_file in project_files:
-                            project_dir = project_file.parent
-                            readme_file = project_dir / "README.md"
-                            
-                            if readme_file.exists():
-                                content = readme_file.read_text()
-                                
-                                # Add new embed marker after H1 title if not already present
-                                if embed_marker not in content:
-                                    lines = content.split('\n')
-                                    insert_pos = 0
-                                    
-                                    # Find the first H1 title
-                                    for i, line in enumerate(lines):
-                                        if line.strip().startswith('# '):
-                                            insert_pos = i + 1
-                                            break
-                                    
-                                    # Insert embed marker after title (with empty line)
-                                    if insert_pos > 0:
-                                        lines.insert(insert_pos, "")
-                                        lines.insert(insert_pos + 1, embed_marker)
-                                        lines.insert(insert_pos + 2, "")
-                                    else:
-                                        # If no H1 found, add at the beginning
-                                        lines.insert(0, embed_marker)
-                                        lines.insert(1, "")
-                                    
-                                    content = '\n'.join(lines)
-                                    readme_file.write_text(content)
-                        
-                        progress.success("✅ Game embeds injected into documentation")
+                    except ImportError as e:
+                        progress.error(f"❌ Failed to import embed injector: {e}")
+                        return 1
             
             # Post-build verification
             if not config.dry_run_mode:
