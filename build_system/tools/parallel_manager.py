@@ -23,12 +23,19 @@ class ParallelManager:
     
     def get_optimal_job_count(self):
         """Calculate optimal number of parallel jobs"""
-        # Start with CPU count minus 1 (leave one core free)
-        base_jobs = max(1, self.cpu_count - 1)
+        # Check if we're in CI environment (more aggressive)
+        is_ci = any(var in os.environ for var in ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'JENKINS_URL', 'BUILDKITE'])
+        
+        if is_ci:
+            # In CI, use all cores more aggressively
+            base_jobs = self.cpu_count
+        else:
+            # Local development, leave one core free
+            base_jobs = max(1, self.cpu_count - 1)
         
         # Adjust based on memory (Godot exports can be memory intensive)
-        # Assume each Godot export needs ~2GB RAM
-        memory_limited_jobs = max(1, int(self.available_memory / 2))
+        # Assume each Godot export needs ~1.5GB RAM (reduced from 2GB for better utilization)
+        memory_limited_jobs = max(1, int(self.available_memory / 1.5))
         
         # Use the more conservative estimate
         optimal_jobs = min(base_jobs, memory_limited_jobs)
@@ -41,7 +48,8 @@ class ParallelManager:
             except ValueError:
                 pass
         
-        return optimal_jobs
+        # Ensure we use at least 2 jobs if we have resources
+        return max(2, optimal_jobs) if self.cpu_count >= 2 else 1
     
     def get_dynamic_job_count(self, current_load=None):
         """Get dynamic job count based on current system load"""
@@ -65,13 +73,25 @@ class ParallelManager:
         """Optimize job count based on number of projects to avoid memory issues"""
         base_jobs = self.get_optimal_job_count()
         
-        # For large numbers of projects, reduce parallelism to avoid memory pressure
-        if project_count > 100:
-            return min(base_jobs, 2)  # Very conservative for large builds
-        elif project_count > 50:
-            return min(base_jobs, 3)  # Moderate for medium builds
+        # Check if we're in CI environment (be more aggressive)
+        is_ci = any(var in os.environ for var in ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'JENKINS_URL', 'BUILDKITE'])
+        
+        if is_ci:
+            # In CI, be more aggressive with large builds
+            if project_count > 100:
+                return min(base_jobs, 4)  # Still conservative but higher than local
+            elif project_count > 50:
+                return min(base_jobs, 6)  # More aggressive for medium builds
+            else:
+                return base_jobs  # Full parallelism for small builds
         else:
-            return base_jobs  # Full parallelism for small builds
+            # Local development, more conservative
+            if project_count > 100:
+                return min(base_jobs, 2)  # Very conservative for large builds
+            elif project_count > 50:
+                return min(base_jobs, 3)  # Moderate for medium builds
+            else:
+                return base_jobs  # Full parallelism for small builds
     
     def get_adaptive_job_count(self, project_count=None, current_load=None):
         """Get the most appropriate job count considering all factors"""

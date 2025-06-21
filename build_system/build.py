@@ -73,6 +73,9 @@ Examples:
   %(prog)s build                    # Build exports only
   %(prog)s docs                     # Generate docs only
   %(prog)s final                    # Build with embeds (production)
+  %(prog)s build --jobs 8           # Use 8 parallel jobs for building
+  %(prog)s build --jobs 0           # Use all available CPU cores
+  %(prog)s final --verbose --jobs 0 # Full build with maximum parallelism
         """
     )
     
@@ -96,7 +99,7 @@ Examples:
     parser.add_argument(
         '--jobs', '-j',
         type=int,
-        help='Number of parallel jobs'
+        help='Number of parallel jobs (default: auto-detected based on CPU/memory, use -j 0 for all cores)'
     )
     
     # Build mode options
@@ -434,14 +437,26 @@ def main():
                             optimal_jobs = parallel_manager.get_adaptive_job_count(
                                 project_count=len(project_files)
                             )
-                            # Still limit to 3 for Godot exports to avoid overwhelming the system
-                            optimal_jobs = min(optimal_jobs, 3)
-                            progress.info(f"⚡ Using {optimal_jobs} adaptive parallel Godot export jobs")
+                            
+                            # Allow override for full CPU utilization
+                            if args.jobs == 0:
+                                # Special case: --jobs 0 means use all available cores
+                                max_godot_jobs = parallel_manager.cpu_count
+                                progress.info("🔥 Maximum parallelism requested - using all CPU cores")
+                            elif args.jobs:
+                                # Explicit job count specified
+                                max_godot_jobs = args.jobs
+                            else:
+                                # Default: use conservative limit for stability
+                                max_godot_jobs = optimal_jobs if optimal_jobs <= 8 else 8
+                            
+                            final_jobs = min(optimal_jobs, max_godot_jobs) if args.jobs != 0 else max_godot_jobs
+                            progress.info(f"⚡ Using {final_jobs} adaptive parallel Godot export jobs (CPU: {parallel_manager.cpu_count}, Memory: {parallel_manager.available_memory:.1f}GB)")
                             
                             # Export projects in parallel
                             results = exporter.export_projects_parallel(
                                 project_files,
-                                max_workers=optimal_jobs,
+                                max_workers=final_jobs,
                                 force_rebuild=args.force_rebuild
                             )
                             
