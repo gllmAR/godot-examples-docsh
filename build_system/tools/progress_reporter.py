@@ -59,6 +59,7 @@ class ProgressReporter:
         self._lock = threading.Lock()
         self._update_thread: Optional[threading.Thread] = None
         self._stop_updates = threading.Event()
+        self._last_was_progress = False
         
     def start_build(self, total_targets: int):
         """Start tracking build progress"""
@@ -213,18 +214,30 @@ class ProgressReporter:
     # Additional utility methods for general logging
     def info(self, message: str):
         """Log an info message"""
+        if self._last_was_progress:
+            print()  # Add newline after progress bar
+            self._last_was_progress = False
         print(message)
     
     def success(self, message: str):
         """Log a success message"""
+        if self._last_was_progress:
+            print()  # Add newline after progress bar
+            self._last_was_progress = False
         print(message)
     
     def error(self, message: str):
         """Log an error message"""
+        if self._last_was_progress:
+            print()  # Add newline after progress bar
+            self._last_was_progress = False
         print(message)
     
     def warning(self, message: str):
         """Log a warning message"""
+        if self._last_was_progress:
+            print()  # Add newline after progress bar
+            self._last_was_progress = False
         print(message)
     
     def update_progress(self, description: str, progress: float):
@@ -239,6 +252,7 @@ class ProgressReporter:
         filled = int(bar_width * progress / 100)
         bar = "█" * filled + "░" * (bar_width - filled)
         print(f"\r{description}: [{bar}] {progress:.1f}%", end="", flush=True)
+        self._last_was_progress = True
 
 
 # Singleton instance for global use
