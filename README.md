@@ -184,40 +184,35 @@ The build system consists of specialized modules in `build_system/`:
 
 ## 🚀 CI/CD Integration
 
-### Simplified Workflows
+### Universal Pipeline Support
 
-The universal build system dramatically simplifies CI/CD:
+The build system is designed for **seamless integration** with any CI/CD provider through standardized Python commands:
 
-**Before** (420 lines of complex YAML):
 ```yaml
-# Complex environment setup, change detection, validation...
-```
-
-**After** (75 lines of simple calls):
-```yaml
+# Complete CI/CD workflow in 3 steps
 steps:
   - name: Setup Environment
     run: python build_system/build.py setup --godot-version 4.5-beta1
   
-  - name: Build with Embeds
+  - name: Build Documentation
     run: python build_system/build.py final --verbose
   
   - name: Prepare Deployment
     run: python build_system/build.py artifact --artifact-output ./deploy
 ```
 
-### Cross-Platform CI
-
-Works with any CI provider:
+### Multi-Platform Compatibility
 
 **GitHub Actions:**
 ```yaml
-- run: python build_system/build.py final --verbose
+- name: Build Godot Documentation
+  run: python build_system/build.py final --verbose
 ```
 
 **GitLab CI:**
 ```yaml
-script: python build_system/build.py final --verbose
+script:
+  - python build_system/build.py final --verbose
 ```
 
 **Jenkins:**
@@ -225,28 +220,50 @@ script: python build_system/build.py final --verbose
 sh 'python build_system/build.py final --verbose'
 ```
 
-## 📈 Performance & Benefits
+**Azure DevOps:**
+```yaml
+- script: python build_system/build.py final --verbose
+```
 
-### Build Performance
-- **Parallel Processing**: 3-4x faster than sequential builds
-- **Smart Caching**: 90% faster incremental builds
-- **Change Detection**: Only rebuilds what changed
-- **CI Optimization**: Reduced logging in automated environments
+### Automated Workflows
 
-### Maintenance Benefits
-- **82% Reduction** in workflow complexity
-- **Platform Independence**: Works with any CI provider
-- **Local Reproducibility**: Test full CI pipeline locally
-- **Modular Design**: Extractable for other repositories
+**🤖 Submodule Synchronization:**
+- Automated weekly updates via GitHub Actions
+- Pull request creation with detailed change logs
+- Manual triggering for immediate updates
+- Cross-repository compatibility
 
-### Comparison
+**🔄 Continuous Integration:**
+- Smart change detection prevents unnecessary builds
+- Parallel processing optimizes build times
+- Comprehensive artifact management
+- Environment validation and setup
 
-| Aspect | Legacy System | Universal System | Improvement |
-|--------|---------------|------------------|-------------|
-| Workflow Lines | 420 | 75 | 82% reduction |
-| Environment Setup | 90 lines YAML | Single command | 95% simpler |
-| Local Testing | Not possible | Full CI locally | ∞% better |
-| Portability | GitHub-only | Any CI provider | Universal |
+## 📈 Performance & Optimization
+
+### Build Intelligence
+- **🧠 Smart Change Detection**: Only rebuilds modified projects using Git diff analysis
+- **⚡ Parallel Processing**: Concurrent project exports utilizing all CPU cores
+- **💾 Advanced Caching**: Filesystem and content-based caching prevents redundant work
+- **🎯 Incremental Builds**: Selective rebuilding based on dependency analysis
+
+### CI/CD Optimization
+- **📊 Reduced Logging**: Streamlined output in automated environments
+- **🚀 Fast Startup**: Pre-validated environments and cached dependencies
+- **🔧 Environment Encapsulation**: Self-contained setup with zero external dependencies
+- **📦 Artifact Management**: Optimized packaging for deployment pipelines
+
+### Scalability Features
+- **🌐 Cross-Platform**: Runs identically on Linux, macOS, and Windows
+- **🔌 Provider Agnostic**: Compatible with any CI/CD platform
+- **📁 Local Reproducibility**: Full CI pipeline testable on developer machines
+- **🔄 Modular Architecture**: Extractable as submodule for other projects
+
+### Performance Metrics
+- **Build Speed**: 3-4x faster than sequential processing
+- **Cache Efficiency**: 90% reduction in rebuild times for unchanged content
+- **Resource Usage**: Optimized memory and CPU utilization
+- **Deployment Size**: Compressed artifacts with intelligent asset optimization
 
 ## 🔧 Development
 
