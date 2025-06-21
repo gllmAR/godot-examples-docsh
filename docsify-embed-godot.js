@@ -541,7 +541,7 @@
     var popoutBtnId = `popout-btn-${sceneName.replace(/\s+/g, '-')}-${Date.now()}`;
 
     var headerTitle = `🎮 Interactive Demo: ${sceneName}`;
-    var instructions = 'Use arrow keys to move • Press R to reset • Interactive demo';
+    var instructions = 'Interactive demo';
 
     // Create control buttons based on device type
     var controlButtons = '';

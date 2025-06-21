@@ -433,47 +433,69 @@ def main():
             if args.target in ['docs', 'all', 'final']:
                 progress.info("📚 Generating documentation and sidebar...")
                 
-                # Modern sidebar generation
+                # Use improved sidebar generation
                 sidebar_output = project_root / "_sidebar.md"
                 projects_dir = project_root / config.structure.projects_dir
                 
                 if args.dry_run:
                     progress.info(f"🔍 Would generate sidebar: {sidebar_output}")
                 else:
-                    # Generate basic sidebar content
-                    sidebar_content = "# Godot Examples Documentation\n\n"
-                    
-                    # Find all projects and create sidebar entries
-                    project_files = list(projects_dir.rglob("project.godot"))
-                    
-                    if project_files:
-                        # Group by category (subdirectory)
-                        categories = {}
-                        for project_file in project_files:
-                            project_dir = project_file.parent
-                            relative_path = project_dir.relative_to(projects_dir)
-                            
-                            # Get category (first level directory)
-                            parts = relative_path.parts
-                            if parts and len(parts) > 0:
-                                category = parts[0]
-                                project_name = parts[-1] if len(parts) > 1 else parts[0]
-                                
-                                if category not in categories:
-                                    categories[category] = []
-                                categories[category].append((project_name, relative_path))
+                    # Import and use improved sidebar generator
+                    try:
+                        from tools.sidebar_generator import generate_sidebar
                         
-                        # Build sidebar content
-                        for category, projects in sorted(categories.items()):
-                            sidebar_content += f"## {category.title()}\n\n"
-                            for project_name, path in sorted(projects):
-                                sidebar_content += f"- [{project_name}]({config.structure.projects_dir}/{path}/README.md)\n"
-                            sidebar_content += "\n"
-                    else:
-                        sidebar_content += "No projects found.\n"
-                    
-                    sidebar_output.write_text(sidebar_content)
-                    progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
+                        sidebar_content, errors = generate_sidebar(
+                            projects_dir, config, validate=True, verbose=args.verbose
+                        )
+                        
+                        if errors:
+                            progress.warning(f"⚠️  Sidebar generated with {len(errors)} warnings:")
+                            for error in errors[:3]:  # Show first 3 errors
+                                progress.warning(f"   - {error}")
+                            if len(errors) > 3:
+                                progress.warning(f"   ... and {len(errors) - 3} more")
+                        
+                        sidebar_output.write_text(sidebar_content)
+                        progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
+                        
+                    except ImportError:
+                        # Fallback to basic generation if improved generator not available
+                        progress.warning("⚠️  Using fallback sidebar generation")
+                        
+                        # Generate basic sidebar content (without title for Docsify compatibility)
+                        sidebar_content = ""
+                        
+                        # Find all projects and create sidebar entries
+                        project_files = list(projects_dir.rglob("project.godot"))
+                        
+                        if project_files:
+                            # Group by category (subdirectory)
+                            categories = {}
+                            for project_file in project_files:
+                                project_dir = project_file.parent
+                                relative_path = project_dir.relative_to(projects_dir)
+                                
+                                # Get category (first level directory)
+                                parts = relative_path.parts
+                                if parts and len(parts) > 0:
+                                    category = parts[0]
+                                    project_name = parts[-1] if len(parts) > 1 else parts[0]
+                                    
+                                    if category not in categories:
+                                        categories[category] = []
+                                    categories[category].append((project_name, relative_path))
+                            
+                            # Build sidebar content in Docsify format
+                            for category, projects in sorted(categories.items()):
+                                sidebar_content += f"- {category.upper()}\n\n"
+                                for project_name, path in sorted(projects):
+                                    sidebar_content += f"  - [{project_name}](/{config.structure.projects_dir}/{path}/README.md)\n"
+                                sidebar_content += "\n"
+                        else:
+                            sidebar_content += "No projects found.\n"
+                        
+                        sidebar_output.write_text(sidebar_content)
+                        progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
             
             # Inject embeds for final/production builds
             if args.target == 'final':
