@@ -13,17 +13,50 @@ import subprocess
 import shutil
 import traceback
 from pathlib import Path
+from typing import Optional, Dict, Any
 
 # Add build_system to path for imports
 build_system_path = Path(__file__).parent
 sys.path.insert(0, str(build_system_path))
 
+# Core imports - always needed
 from project_config import BuildSystemConfig, setup_build_system
-from modern_build_env import ModernBuildEnvironment
-from tools.environment_manager import setup_godot_environment
-from tools.artifact_manager import ArtifactManager
-from tools.change_detector import detect_changes
 from tools.progress_reporter import ProgressReporter
+
+# Lazy imports - loaded only when needed
+_lazy_imports = {}
+
+def _lazy_import(module_name: str, class_name: Optional[str] = None):
+    """Lazy import helper to reduce startup time"""
+    if module_name not in _lazy_imports:
+        if module_name == 'modern_build_env':
+            from modern_build_env import ModernBuildEnvironment
+            _lazy_imports[module_name] = ModernBuildEnvironment
+        elif module_name == 'environment_manager':
+            from tools.environment_manager import setup_godot_environment, GodotEnvironmentManager
+            _lazy_imports[module_name] = {'setup_godot_environment': setup_godot_environment, 'GodotEnvironmentManager': GodotEnvironmentManager}
+        elif module_name == 'artifact_manager':
+            from tools.artifact_manager import ArtifactManager
+            _lazy_imports[module_name] = ArtifactManager
+        elif module_name == 'change_detector':
+            from tools.change_detector import detect_changes
+            _lazy_imports[module_name] = detect_changes
+        elif module_name == 'godot_exporter':
+            from tools.godot_exporter import GodotExporter, create_fallback_export
+            _lazy_imports[module_name] = {'GodotExporter': GodotExporter, 'create_fallback_export': create_fallback_export}
+        elif module_name == 'parallel_manager':
+            from tools.parallel_manager import ParallelManager
+            _lazy_imports[module_name] = ParallelManager
+        elif module_name == 'sidebar_generator':
+            from tools.sidebar_generator import generate_sidebar
+            _lazy_imports[module_name] = generate_sidebar
+        elif module_name == 'embed_injector':
+            from tools.embed_injector import inject_embeds
+            _lazy_imports[module_name] = inject_embeds
+    
+    if class_name and isinstance(_lazy_imports[module_name], dict):
+        return _lazy_imports[module_name][class_name]
+    return _lazy_imports[module_name]
 
 
 def create_argument_parser():
@@ -205,7 +238,7 @@ def main():
         # Handle environment setup targets first
         if args.target == 'setup' or args.setup_godot:
             progress.info("🎮 Setting up Godot environment...")
-            success = setup_godot_environment(
+            success = _lazy_import('environment_manager', 'setup_godot_environment')(
                 config.godot_version,
                 force_reinstall=args.force_rebuild,
                 progress_reporter=progress
@@ -214,8 +247,7 @@ def main():
         
         if args.target == 'verify' or args.verify_environment:
             progress.info("🔍 Verifying Godot environment...")
-            from tools.environment_manager import GodotEnvironmentManager
-            manager = GodotEnvironmentManager(progress, config)
+            manager = _lazy_import('environment_manager', 'GodotEnvironmentManager')(progress, config)
             verification = manager.verify_installation(config.godot_version)
             
             all_good = all(verification.values())
@@ -232,7 +264,7 @@ def main():
         # Handle artifact preparation
         if args.target == 'artifact' or args.prepare_artifact:
             progress.info("📦 Preparing deployment artifact...")
-            artifact_manager = ArtifactManager(progress)
+            artifact_manager = _lazy_import('artifact_manager')(progress)
             
             projects_dir = project_root / config.structure.projects_dir
             output_dir = args.artifact_output or project_root / "deployment_artifact"
@@ -273,7 +305,7 @@ def main():
             # Clean project artifacts
             projects_dir = project_root / config.structure.projects_dir
             if projects_dir.exists():
-                artifact_manager = ArtifactManager(progress)
+                artifact_manager = _lazy_import('artifact_manager')(progress)
                 cleaned_count = artifact_manager.clean_build_artifacts(projects_dir)
                 progress.success(f"✅ Cleaned {cleaned_count} artifacts")
             
@@ -284,7 +316,7 @@ def main():
         changed_projects = set()
         if not args.no_change_detection and not args.force_rebuild:
             progress.info("🔍 Detecting changes...")
-            changes = detect_changes(
+            changes = _lazy_import('change_detector')(
                 project_root,
                 args.base_ref,
                 args.force_rebuild,
@@ -308,7 +340,7 @@ def main():
             godot_binary = "godot"
         
         # Create build environment
-        env = ModernBuildEnvironment(
+        env = _lazy_import('modern_build_env')(
             godot_binary=godot_binary,
             projects_dir=project_root / config.structure.projects_dir,
             max_parallel_jobs=config.max_parallel_jobs,
@@ -326,24 +358,32 @@ def main():
         
         if args.preview:
             progress.info("📋 Build Plan Preview:")
-            # For preview mode, just scan the directory for projects
+            # Memory-efficient preview - don't load all files at once
             projects_dir = project_root / config.structure.projects_dir
-            project_files = list(projects_dir.rglob("project.godot"))
             
-            if changed_projects:
-                # Filter to only changed projects
-                filtered_files = []
-                for project_file in project_files:
-                    project_rel = str(project_file.parent.relative_to(projects_dir))
-                    if any(project_rel.startswith(changed) for changed in changed_projects):
-                        filtered_files.append(project_file)
-                project_files = filtered_files
+            # Use generator for memory efficiency
+            def project_generator():
+                for project_file in projects_dir.rglob("project.godot"):
+                    if not changed_projects:
+                        yield project_file
+                    else:
+                        project_rel = str(project_file.parent.relative_to(projects_dir))
+                        if any(project_rel.startswith(changed) for changed in changed_projects):
+                            yield project_file
             
-            progress.info(f"Found {len(project_files)} projects to build:")
-            for project_file in project_files[:10]:  # Show first 10
-                progress.info(f"  - {project_file.parent.name}")
-            if len(project_files) > 10:
-                progress.info(f"  ... and {len(project_files) - 10} more")
+            # Count and preview first 10 without loading all into memory
+            project_count = 0
+            preview_projects = []
+            for project_file in project_generator():
+                if len(preview_projects) < 10:
+                    preview_projects.append(project_file.parent.name)
+                project_count += 1
+            
+            progress.info(f"Found {project_count} projects to build:")
+            for project_name in preview_projects:
+                progress.info(f"  - {project_name}")
+            if project_count > 10:
+                progress.info(f"  ... and {project_count - 10} more")
             return 0
         
         # Perform the actual build
@@ -353,16 +393,13 @@ def main():
                 
                 # Import the real Godot exporter
                 try:
-                    from .tools.godot_exporter import GodotExporter, create_fallback_export
-                    from .tools.parallel_manager import ParallelManager
+                    exporter = _lazy_import('godot_exporter', 'GodotExporter')(
+                        godot_binary=godot_binary,  # Use the detected system binary
+                        progress_reporter=progress
+                    )
                 except ImportError:
-                    # Fallback for CLI execution
-                    import sys
-                    tools_path = Path(__file__).parent / "tools"
-                    if str(tools_path) not in sys.path:
-                        sys.path.insert(0, str(tools_path))
-                    from godot_exporter import GodotExporter, create_fallback_export
-                    from parallel_manager import ParallelManager
+                    progress.error("❌ Failed to import Godot exporter")
+                    return 1
                 
                 # Find all Godot projects
                 projects_dir = project_root / config.structure.projects_dir
@@ -376,12 +413,6 @@ def main():
                     if args.dry_run:
                         progress.info("🔍 Would export {} projects using Godot".format(len(project_files)))
                     else:
-                        # Initialize real Godot exporter
-                        exporter = GodotExporter(
-                            godot_binary=godot_binary,  # Use the detected system binary
-                            progress_reporter=progress
-                        )
-                        
                         # Verify Godot binary is available
                         if not exporter.verify_godot_binary():
                             progress.error(f"❌ Godot binary not found or not working: {env.config['godot_binary']}")
@@ -389,6 +420,7 @@ def main():
                             
                             # Create fallback exports instead
                             progress.info("🔄 Creating fallback HTML exports...")
+                            create_fallback_export = _lazy_import('godot_exporter', 'create_fallback_export')
                             for project_file in project_files:
                                 project_dir = project_file.parent
                                 export_dir = project_dir / "exports" / "web"
@@ -397,10 +429,14 @@ def main():
                             
                             progress.warning("⚠️ Created fallback exports. Install Godot for real game exports.")
                         else:
-                            # Use parallel export with real Godot
-                            parallel_manager = ParallelManager()
-                            optimal_jobs = min(parallel_manager.get_optimal_job_count(), 3)  # Limit to 3 for Godot exports
-                            progress.info(f"⚡ Using {optimal_jobs} parallel Godot export jobs")
+                            # Use parallel export with intelligent job management
+                            parallel_manager = _lazy_import('parallel_manager')()
+                            optimal_jobs = parallel_manager.get_adaptive_job_count(
+                                project_count=len(project_files)
+                            )
+                            # Still limit to 3 for Godot exports to avoid overwhelming the system
+                            optimal_jobs = min(optimal_jobs, 3)
+                            progress.info(f"⚡ Using {optimal_jobs} adaptive parallel Godot export jobs")
                             
                             # Export projects in parallel
                             results = exporter.export_projects_parallel(
@@ -416,6 +452,7 @@ def main():
                                 progress.error(f"❌ {summary['failed']} exports failed: {summary['failed_projects']}")
                                 
                                 # Create fallback exports for failed projects
+                                create_fallback_export = _lazy_import('godot_exporter', 'create_fallback_export')
                                 for result in results:
                                     if not result.success:
                                         export_dir = result.project_path / "exports" / "web"
@@ -439,28 +476,22 @@ def main():
                     progress.info("🔍 Would generate sidebar and documentation")
                 else:
                     # Use the sidebar generator tool
-                    try:
-                        from tools.sidebar_generator import generate_sidebar
-                        
-                        projects_dir = project_root / config.structure.projects_dir
-                        sidebar_content, errors = generate_sidebar(
-                            projects_dir, config, validate=True, verbose=args.verbose
-                        )
-                        
-                        if errors:
-                            progress.warning(f"⚠️ Sidebar generated with {len(errors)} warnings:")
-                            for error in errors[:3]:  # Show first 3 errors
-                                progress.warning(f"   - {error}")
-                            if len(errors) > 3:
-                                progress.warning(f"   ... and {len(errors) - 3} more")
-                        
-                        sidebar_output = project_root / "_sidebar.md"
-                        sidebar_output.write_text(sidebar_content)
-                        progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
-                        
-                    except ImportError as e:
-                        progress.error(f"❌ Failed to import sidebar generator: {e}")
-                        return 1
+                    generate_sidebar = _lazy_import('sidebar_generator')
+                    projects_dir = project_root / config.structure.projects_dir
+                    sidebar_content, errors = generate_sidebar(
+                        projects_dir, config, validate=True, verbose=args.verbose
+                    )
+                    
+                    if errors:
+                        progress.warning(f"⚠️ Sidebar generated with {len(errors)} warnings:")
+                        for error in errors[:3]:  # Show first 3 errors
+                            progress.warning(f"   - {error}")
+                        if len(errors) > 3:
+                            progress.warning(f"   ... and {len(errors) - 3} more")
+                    
+                    sidebar_output = project_root / "_sidebar.md"
+                    sidebar_output.write_text(sidebar_content)
+                    progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
             
             # Inject embeds for final/production builds
             if args.target == 'final':
@@ -470,41 +501,35 @@ def main():
                     progress.info("🔍 Would inject game embeds into documentation")
                 else:
                     # Use the embed injector tool
-                    try:
-                        from tools.embed_injector import inject_embeds
-                        
-                        projects_dir = project_root / config.structure.projects_dir
-                        stats, errors = inject_embeds(
-                            projects_dir, dry_run=False, verbose=args.verbose
-                        )
-                        
-                        if errors:
-                            progress.warning(f"⚠️ Embed injection completed with {len(errors)} warnings:")
-                            for error in errors[:3]:  # Show first 3 errors
-                                progress.warning(f"   - {error}")
-                            if len(errors) > 3:
-                                progress.warning(f"   ... and {len(errors) - 3} more")
-                        
-                        progress.success(f"✅ Game embeds injected: {stats['files_processed']} files processed")
-                        if args.verbose:
-                            progress.info(f"   - Embeds added: {stats['embeds_added']}")
-                            progress.info(f"   - Old embeds removed: {stats['old_embeds_removed']}")
-                        
-                    except ImportError as e:
-                        progress.error(f"❌ Failed to import embed injector: {e}")
-                        return 1
+                    inject_embeds = _lazy_import('embed_injector')
+                    projects_dir = project_root / config.structure.projects_dir
+                    stats, errors = inject_embeds(
+                        projects_dir, dry_run=False, verbose=args.verbose
+                    )
+                    
+                    if errors:
+                        progress.warning(f"⚠️ Embed injection completed with {len(errors)} warnings:")
+                        for error in errors[:3]:  # Show first 3 errors
+                            progress.warning(f"   - {error}")
+                        if len(errors) > 3:
+                            progress.warning(f"   ... and {len(errors) - 3} more")
+                    
+                    progress.success(f"✅ Game embeds injected: {stats['files_processed']} files processed")
+                    if args.verbose:
+                        progress.info(f"   - Embeds added: {stats['embeds_added']}")
+                        progress.info(f"   - Old embeds removed: {stats['old_embeds_removed']}")
+        
+        # Post-build verification
+        if not config.dry_run_mode:
+            progress.info("🔍 Verifying build results...")
+            artifact_manager = _lazy_import('artifact_manager')(progress)
+            projects_dir = project_root / config.structure.projects_dir
+            verification = artifact_manager.verify_build_results(projects_dir)
             
-            # Post-build verification
-            if not config.dry_run_mode:
-                progress.info("🔍 Verifying build results...")
-                artifact_manager = ArtifactManager(progress)
-                projects_dir = project_root / config.structure.projects_dir
-                verification = artifact_manager.verify_build_results(projects_dir)
-                
-                if verification['success_rate'] == 100:
-                    progress.success(f"✅ All {verification['total_projects']} projects built successfully!")
-                else:
-                    progress.warning(f"⚠️  {verification['complete_exports']}/{verification['total_projects']} projects built ({verification['success_rate']:.1f}% success rate)")
+            if verification['success_rate'] == 100:
+                progress.success(f"✅ All {verification['total_projects']} projects built successfully!")
+            else:
+                progress.warning(f"⚠️  {verification['complete_exports']}/{verification['total_projects']} projects built ({verification['success_rate']:.1f}% success rate)")
         
         progress.success("✅ Build completed successfully!")
         return 0

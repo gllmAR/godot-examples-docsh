@@ -43,6 +43,44 @@ class ParallelManager:
         
         return optimal_jobs
     
+    def get_dynamic_job_count(self, current_load=None):
+        """Get dynamic job count based on current system load"""
+        base_jobs = self.get_optimal_job_count()
+        
+        if current_load is None:
+            try:
+                current_load = psutil.cpu_percent(interval=0.1)
+            except:
+                current_load = 50  # Assume moderate load
+        
+        # Reduce jobs if system is under high load
+        if current_load > 80:
+            return max(1, base_jobs // 2)
+        elif current_load > 60:
+            return max(1, int(base_jobs * 0.75))
+        else:
+            return base_jobs
+    
+    def get_memory_efficient_job_count(self, project_count):
+        """Optimize job count based on number of projects to avoid memory issues"""
+        base_jobs = self.get_optimal_job_count()
+        
+        # For large numbers of projects, reduce parallelism to avoid memory pressure
+        if project_count > 100:
+            return min(base_jobs, 2)  # Very conservative for large builds
+        elif project_count > 50:
+            return min(base_jobs, 3)  # Moderate for medium builds
+        else:
+            return base_jobs  # Full parallelism for small builds
+    
+    def get_adaptive_job_count(self, project_count=None, current_load=None):
+        """Get the most appropriate job count considering all factors"""
+        memory_jobs = self.get_memory_efficient_job_count(project_count) if project_count else self.get_optimal_job_count()
+        dynamic_jobs = self.get_dynamic_job_count(current_load)
+        
+        # Use the most conservative estimate
+        return min(memory_jobs, dynamic_jobs)
+    
     def estimate_build_time(self, num_projects, jobs=None):
         """Estimate build time based on project count and parallelism"""
         if jobs is None:
