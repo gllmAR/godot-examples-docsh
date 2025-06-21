@@ -1,0 +1,90 @@
+name: 🤖 Auto-update Submodules
+
+# This workflow automatically updates Git submodules to their latest versions
+# and creates a pull request with the changes
+
+on:
+  # Run manually
+  workflow_dispatch:
+  
+  # Run on a schedule (weekly on Sundays at 2 AM UTC)
+  schedule:
+    - cron: '0 2 * * 0'
+  
+  # Allow running from other workflows
+  workflow_call:
+
+jobs:
+  update-submodules:
+    name: Update Submodules
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for submodule operations
+          fetch-depth: 0
+          # Initialize submodules
+          submodules: true
+          # Use token that can create PRs
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: 🔧 Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: 📋 Check for Submodules
+        id: check-submodules
+        run: |
+          if [[ -f .gitmodules ]]; then
+            echo "has-submodules=true" >> $GITHUB_OUTPUT
+            echo "Found submodules:"
+            cat .gitmodules
+          else
+            echo "has-submodules=false" >> $GITHUB_OUTPUT
+            echo "No submodules found in repository"
+          fi
+      
+      - name: 🔄 Sync Submodules
+        if: steps.check-submodules.outputs.has-submodules == 'true'
+        run: |
+          ./sync_submodules.sh --create-pr --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 📊 Summary
+        if: always()
+        run: |
+          echo "## 🤖 Submodule Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.check-submodules.outputs.has-submodules }}" == "true" ]]; then
+            echo "✅ **Submodules found and processed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The sync script has:" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔍 Checked all submodules for updates" >> $GITHUB_STEP_SUMMARY
+            echo "- 📡 Fetched latest changes from upstream repositories" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔄 Updated submodules to latest commits" >> $GITHUB_STEP_SUMMARY
+            echo "- 🔀 Created a pull request if updates were found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the [Pull Requests](../../pulls) tab for any created PRs." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ **No submodules found in repository**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This repository doesn't contain any Git submodules to update." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Workflow completed at $(date -u '+%Y-%m-%d %H:%M:%S') UTC*" >> $GITHUB_STEP_SUMMARY

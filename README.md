@@ -67,6 +67,33 @@ python build_system/build.py final --verbose
 | `artifact` | Deployment preparation | CI/CD packaging |
 | `clean` | Remove build artifacts | Fresh start |
 
+## 🔄 Submodule Management
+
+Keep your Godot demo projects up to date with automated submodule synchronization:
+
+```bash
+# Update submodules to latest versions
+./build.sh --sync-submodules
+
+# Or use the target variant
+./build.sh sync-submodules --verbose
+
+# Create a pull request with updates (requires GitHub CLI)
+./sync_submodules.sh --create-pr
+
+# Just update locally without committing
+./sync_submodules.sh --no-commit
+```
+
+### CI Integration
+
+Automated submodule updates via GitHub Actions:
+- **Weekly**: Runs every Sunday at 2 AM UTC
+- **Manual**: Trigger via Actions tab
+- **Auto-PR**: Creates pull requests with detailed change logs
+
+See [📖 Submodule Sync Documentation](docs/SUBMODULE_SYNC.md) for complete details.
+
 ## 🏗️ Universal Build System
 
 ### Core Commands

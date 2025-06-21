@@ -67,6 +67,7 @@ Options:
     --godot-binary PATH Path to Godot binary (default: godot)
     --godot-version VER Expected Godot version (for validation)
     --build-mode MODE   Build mode: debug or release (default: release)
+    --sync-submodules   Update Git submodules to latest versions
 
 Build Targets:
     build               Build all game exports
@@ -75,6 +76,7 @@ Build Targets:
     add-markers         Add embed markers to README files
     inject-embeds       Inject actual embeds into README files  
     all                 Build everything (default)
+    sync-submodules     Update Git submodules (alias for --sync-submodules)
 
 Examples:
     ./build.sh                          # Build everything
@@ -84,6 +86,8 @@ Examples:
     ./build.sh --preview               # Show build plan
     ./build.sh --progress build        # Build with progress, exports only
     ./build.sh --jobs 4 --verbose      # Build with 4 jobs, verbose output
+    ./build.sh --sync-submodules        # Update submodules to latest versions
+    ./build.sh sync-submodules --verbose # Update submodules with verbose output
 EOF
     exit 0
 }
@@ -163,9 +167,22 @@ while [[ $# -gt 0 ]]; do
             PYTHON_ARGS+=("--dry-run")
             shift
             ;;
-        build|docs|final|all|setup|verify|artifact)
-            BUILD_TARGET="$1"
-            shift
+        --sync-submodules)
+            echo -e "${BLUE}🔄 Syncing submodules to latest versions...${NC}"
+            "$SCRIPT_DIR/sync_submodules.sh" --verbose
+            exit $?
+            ;;
+        build|docs|final|all|setup|verify|artifact|sync-submodules)
+            if [[ "$1" == "sync-submodules" ]]; then
+                echo -e "${BLUE}🔄 Syncing submodules to latest versions...${NC}"
+                shift
+                # Pass remaining arguments to sync script
+                "$SCRIPT_DIR/sync_submodules.sh" "$@"
+                exit $?
+            else
+                BUILD_TARGET="$1"
+                shift
+            fi
             ;;
         *)
             echo -e "${RED}❌ Unknown option: $1${NC}"
