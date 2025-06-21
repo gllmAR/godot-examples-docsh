@@ -222,16 +222,24 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
                 error_message=error_msg
             )
     
-    def export_project_with_retry(self, project_path: Path, max_retries: int = 2, force_rebuild: bool = False) -> ExportResult:
+    def export_project_with_retry(self, project_path: Path, max_retries: int = 3, force_rebuild: bool = False) -> ExportResult:
         """Export a project with retry logic for handling system errors"""
         last_error = None
         
         for attempt in range(max_retries + 1):
             if attempt > 0:
                 self.progress.info(f"🔄 Retry {attempt}/{max_retries} for {project_path.name}")
-                # Wait a bit before retry to let system recover
+                # Wait progressively longer before retry to let system recover
                 import time
-                time.sleep(1 + attempt)
+                wait_time = min(2 ** attempt, 10)  # Exponential backoff, max 10s
+                time.sleep(wait_time)
+                
+                # Try to free up some resources
+                try:
+                    import gc
+                    gc.collect()
+                except:
+                    pass
             
             result = self.export_project_to_web(project_path, force_rebuild)
             
@@ -242,10 +250,12 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
             
             # Check if this is a retryable error
             if result.error_message and any(err in result.error_message.lower() for err in [
-                'invalid argument', 'system_error', 'std::system_error', 'resource temporarily unavailable'
+                'invalid argument', 'system_error', 'std::system_error', 
+                'resource temporarily unavailable', 'cannot allocate memory',
+                'too many open files', 'out of memory'
             ]):
                 if attempt < max_retries:
-                    self.progress.warning(f"⚠️ Retryable error for {project_path.name}, attempting retry...")
+                    self.progress.warning(f"⚠️ Retryable system error for {project_path.name} (attempt {attempt + 1}), retrying...")
                     continue
             else:
                 # Non-retryable error, fail immediately
@@ -273,7 +283,7 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         with concurrent.futures.ThreadPoolExecutor(max_workers=batch_size) as executor:
             # Submit all export tasks with retry capability
             future_to_project = {
-                executor.submit(self.export_project_with_retry, project_file.parent, 2, force_rebuild): project_file
+                executor.submit(self.export_project_with_retry, project_file.parent, 3, force_rebuild): project_file
                 for project_file in project_files
             }
             
@@ -350,7 +360,7 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         """Analyze Godot export error and provide helpful diagnostics"""
         # Common error patterns and solutions
         error_patterns = {
-            -6: "System resource error - try reducing parallel jobs or check memory",
+            -6: "System resource error - try reducing parallel jobs or check memory/file descriptors",
             -9: "Process killed - likely out of memory or timeout",
             -11: "Segmentation fault - corrupted project or missing dependencies",
             1: "Export template or preset issue",
@@ -364,20 +374,24 @@ progressive_web_app/background_color=Color(0, 0, 0, 1)
         # Analyze stderr for specific issues
         if stderr:
             stderr_lower = stderr.lower()
-            if "invalid argument" in stderr_lower:
-                base_error += " - Check file paths and permissions"
+            if "invalid argument" in stderr_lower and "std::system_error" in stderr_lower:
+                base_error += " - Likely file descriptor/resource limit reached. Try: ulimit -n 4096"
+            elif "invalid argument" in stderr_lower:
+                base_error += " - Check file paths, permissions, or reduce concurrent exports"
             elif "cannot allocate memory" in stderr_lower or "out of memory" in stderr_lower:
-                base_error += " - Insufficient memory, reduce parallel jobs"
+                base_error += " - Insufficient memory, reduce parallel jobs with --jobs N"
+            elif "too many open files" in stderr_lower:
+                base_error += " - File descriptor limit exceeded, try: ulimit -n 4096"
             elif "template" in stderr_lower and "not found" in stderr_lower:
-                base_error += " - Export templates missing, run setup"
+                base_error += " - Export templates missing, run: godot --export-debug Web"
             elif "permission denied" in stderr_lower:
                 base_error += " - Permission error, check file/directory permissions"
             elif "display" in stderr_lower or "x11" in stderr_lower:
-                base_error += " - Display/X11 issue in headless environment"
+                base_error += " - Display/X11 issue in headless environment, set DISPLAY=:0"
         
         # Include relevant stderr excerpt
         if stderr and len(stderr.strip()) > 0:
-            stderr_excerpt = stderr.strip()[:200] + ("..." if len(stderr) > 200 else "")
+            stderr_excerpt = stderr.strip()[:300] + ("..." if len(stderr) > 300 else "")
             return f"{base_error}\nDetails: {stderr_excerpt}"
         
         return base_error
