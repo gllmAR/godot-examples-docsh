@@ -58,7 +58,7 @@ jobs:
         run: |
           echo "🏗️ Building all Godot projects for release..."
           
-          python build_system/build.py \
+          python godot-ci-build-system/build.py \
             --projects-dir godot-demo-projects \
             --godot-version 4.3 \
             --jobs 4 \
@@ -71,10 +71,10 @@ jobs:
           echo "📚 Generating release documentation..."
           
           # Generate documentation
-          python build_system/builders/docs_generator.py
+          python godot-ci-build-system/builders/docs_generator.py
           
           # Inject embeds
-          python build_system/builders/embed_injector.py
+          python godot-ci-build-system/builders/embed_injector.py
           
           # Create comprehensive statistics
           python -c "

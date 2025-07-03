@@ -183,7 +183,7 @@ if [[ "$CREATE_PR" == "true" ]]; then
 fi
 
 # Build Python command
-PYTHON_CMD="python3 ${SCRIPT_DIR}/build_system/tools/submodule_sync.py"
+PYTHON_CMD="python3 ${SCRIPT_DIR}/godot-ci-build-system/tools/submodule_sync.py"
 PYTHON_CMD+=" --repo-root ."
 
 if [[ "$COMMIT_CHANGES" == "false" ]]; then

@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BUILD_SYSTEM_DIR="$SCRIPT_DIR/build_system"
+BUILD_SYSTEM_DIR="$SCRIPT_DIR/godot-ci-build-system"
 
 # Function to check dependencies
 check_dependencies() {

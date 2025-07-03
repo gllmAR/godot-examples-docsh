@@ -56,27 +56,27 @@ jobs:
       - name: Setup Godot Environment
         run: |
           echo "🎮 Setting up Godot ${{ env.GODOT_VERSION }} environment..."
-          python build_system/build.py setup \
+          python godot-ci-build-system/build.py setup \
             --godot-version ${{ env.GODOT_VERSION }} \
             --verbose
 
       - name: Verify Godot Environment
         run: |
           echo "🔍 Verifying Godot environment..."
-          python build_system/build.py verify \
+          python godot-ci-build-system/build.py verify \
             --godot-version ${{ env.GODOT_VERSION }} \
             --verbose
 
       - name: Clean previous artifacts
         run: |
           echo "🧹 Cleaning previous build artifacts..."
-          python build_system/build.py clean \
+          python godot-ci-build-system/build.py clean \
             --verbose
 
       - name: Build projects and documentation
         run: |
           echo "🏗️ Building all projects and final documentation with embeds..."
-          python build_system/build.py final \
+          python godot-ci-build-system/build.py final \
             --godot-version ${{ env.GODOT_VERSION }} \
             --jobs 4 \
             --verbose \
@@ -85,7 +85,7 @@ jobs:
       - name: Prepare deployment artifact
         run: |
           echo "📦 Preparing deployment artifact..."
-          python build_system/build.py artifact \
+          python godot-ci-build-system/build.py artifact \
             --artifact-output ./deployment \
             --verbose
 

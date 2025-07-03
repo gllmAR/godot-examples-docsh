@@ -25,10 +25,10 @@ cd godot-examples-docsh
 pip install -r requirements.txt
 
 # Set up Godot environment (downloads Godot + export templates)
-python build_system/build.py setup --godot-version 4.5-beta1
+python godot-ci-build-system/build.py setup --godot-version 4.5-beta1
 
 # Build everything (projects + docs + embeds for production)
-python build_system/build.py final --verbose
+python godot-ci-build-system/build.py final --verbose
 
 # Or use the convenience wrapper
 ./build.sh
@@ -37,7 +37,7 @@ python build_system/build.py final --verbose
 ## ✨ Key Features
 
 ### � Universal Build System
-- **Single Entry Point**: `python build_system/build.py` handles everything
+- **Single Entry Point**: `python godot-ci-build-system/build.py` handles everything
 - **Modular Architecture**: Extractable as submodule for other repositories
 - **Cross-Platform**: Works on Linux, macOS, Windows
 - **CI/CD Ready**: Encapsulates all build logic for any CI provider
@@ -100,25 +100,25 @@ See [📖 Submodule Sync Documentation](docs/SUBMODULE_SYNC.md) for complete det
 
 ```bash
 # Complete production build with embeds
-python build_system/build.py final --verbose
+python godot-ci-build-system/build.py final --verbose
 
 # Development build (no embeds)
-python build_system/build.py all --jobs 4
+python godot-ci-build-system/build.py all --jobs 4
 
 # Set up environment
-python build_system/build.py setup --godot-version 4.5-beta1
+python godot-ci-build-system/build.py setup --godot-version 4.5-beta1
 
 # Verify installation
-python build_system/build.py verify
+python godot-ci-build-system/build.py verify
 
 # Preview build plan
-python build_system/build.py --preview --dry-run
+python godot-ci-build-system/build.py --preview --dry-run
 
 # Prepare deployment artifact
-python build_system/build.py artifact --artifact-output ./deploy
+python godot-ci-build-system/build.py artifact --artifact-output ./deploy
 
 # Clean rebuild
-python build_system/build.py clean && python build_system/build.py final
+python godot-ci-build-system/build.py clean && python godot-ci-build-system/build.py final
 ```
 
 ### Configuration
@@ -192,13 +192,13 @@ The build system is designed for **seamless integration** with any CI/CD provide
 # Complete CI/CD workflow in 3 steps
 steps:
   - name: Setup Environment
-    run: python build_system/build.py setup --godot-version 4.5-beta1
+    run: python godot-ci-build-system/build.py setup --godot-version 4.5-beta1
   
   - name: Build Documentation
-    run: python build_system/build.py final --verbose
+    run: python godot-ci-build-system/build.py final --verbose
   
   - name: Prepare Deployment
-    run: python build_system/build.py artifact --artifact-output ./deploy
+    run: python godot-ci-build-system/build.py artifact --artifact-output ./deploy
 ```
 
 ### Multi-Platform Compatibility
@@ -206,23 +206,23 @@ steps:
 **GitHub Actions:**
 ```yaml
 - name: Build Godot Documentation
-  run: python build_system/build.py final --verbose
+  run: python godot-ci-build-system/build.py final --verbose
 ```
 
 **GitLab CI:**
 ```yaml
 script:
-  - python build_system/build.py final --verbose
+  - python godot-ci-build-system/build.py final --verbose
 ```
 
 **Jenkins:**
 ```groovy
-sh 'python build_system/build.py final --verbose'
+sh 'python godot-ci-build-system/build.py final --verbose'
 ```
 
 **Azure DevOps:**
 ```yaml
-- script: python build_system/build.py final --verbose
+- script: python godot-ci-build-system/build.py final --verbose
 ```
 
 ### Automated Workflows
@@ -279,9 +279,9 @@ sh 'python build_system/build.py final --verbose'
 
 ```bash
 # Quick development workflow
-python build_system/build.py all --jobs 4        # Fast development build
-python build_system/build.py docs                # Update docs only
-python build_system/build.py final --dry-run     # Preview production build
+python godot-ci-build-system/build.py all --jobs 4        # Fast development build
+python godot-ci-build-system/build.py docs                # Update docs only
+python godot-ci-build-system/build.py final --dry-run     # Preview production build
 
 # Convenience wrapper
 ./build.sh --preview                              # Same as above
@@ -291,13 +291,13 @@ python build_system/build.py final --dry-run     # Preview production build
 
 ```bash
 # Verify environment
-python build_system/build.py verify
+python godot-ci-build-system/build.py verify
 
 # Clean rebuild
-python build_system/build.py clean
+python godot-ci-build-system/build.py clean
 
 # Detailed diagnostics
-python build_system/build.py all --verbose --no-cache
+python godot-ci-build-system/build.py all --verbose --no-cache
 ```
 
 ## 🔮 Universal Build System
@@ -315,7 +315,7 @@ cp build_system/build_config.example.json build_config.json
 # Edit build_config.json for your project structure
 
 # Use in CI
-python build_system/build.py final --verbose
+python godot-ci-build-system/build.py final --verbose
 ```
 
 ### Benefits of Modular Design
@@ -331,7 +331,7 @@ See [`build_system/README.md`](build_system/README.md) for detailed architecture
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Test your changes: `python build_system/build.py final --dry-run`
+3. Test your changes: `python godot-ci-build-system/build.py final --dry-run`
 4. Commit: `git commit -m 'Add amazing feature'`
 5. Push: `git push origin feature/amazing-feature`
 6. Open a Pull Request
@@ -340,9 +340,9 @@ See [`build_system/README.md`](build_system/README.md) for detailed architecture
 
 ```bash
 # Test locally before pushing
-python build_system/build.py verify              # Check environment
-python build_system/build.py final --dry-run     # Validate build plan
-python build_system/build.py all --verbose       # Test full build
+python godot-ci-build-system/build.py verify              # Check environment
+python godot-ci-build-system/build.py final --dry-run     # Validate build plan
+python godot-ci-build-system/build.py all --verbose       # Test full build
 ```
 
 ## 📄 License

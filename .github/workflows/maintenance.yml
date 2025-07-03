@@ -223,7 +223,7 @@ jobs:
       - name: Run security linting
         run: |
           echo "🔍 Running security linting with bandit..."
-          bandit -r build_system/ -f json -o bandit_report.json || true
+          bandit -r godot-ci-build-system/ -f json -o bandit_report.json || true
           
           if [ -s bandit_report.json ]; then
             echo "⚠️ Security issues found in code"

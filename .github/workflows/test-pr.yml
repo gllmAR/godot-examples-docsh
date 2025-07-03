@@ -38,24 +38,24 @@ jobs:
 
       - name: Run build system tests
         run: |
-          cd build_system
+          cd godot-ci-build-system
           python test_build_system.py
 
       - name: Test dependency checker
         run: |
-          python build_system/tools/dependency_checker.py
+          python godot-ci-build-system/tools/dependency_checker.py
 
       - name: Lint Python code
         run: |
           python -m pip install flake8
-          flake8 build_system/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 build_system/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 godot-ci-build-system/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 godot-ci-build-system/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Upload coverage reports
         if: false  # Disabled until we have proper test coverage setup
         uses: codecov/codecov-action@v3
         with:
-          file: ./build_system/coverage.xml
+          file: ./godot-ci-build-system/coverage.xml
           flags: build-system
           name: build-system-coverage
 
@@ -160,7 +160,7 @@ jobs:
         run: |
           python -c "
           import sys
-          sys.path.append('build_system')
+          sys.path.append('godot-ci-build-system')
           from config.build_config import *
           print('✅ Build configuration is valid')
           "
