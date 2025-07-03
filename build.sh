@@ -167,6 +167,14 @@ while [[ $# -gt 0 ]]; do
             PYTHON_ARGS+=("--dry-run")
             shift
             ;;
+        --force-rebuild)
+            PYTHON_ARGS+=("--force-rebuild")
+            shift
+            ;;
+        --no-change-detection)
+            PYTHON_ARGS+=("--no-change-detection")
+            shift
+            ;;
         --sync-submodules)
             echo -e "${BLUE}🔄 Syncing submodules to latest versions...${NC}"
             "$SCRIPT_DIR/sync_submodules.sh" --verbose

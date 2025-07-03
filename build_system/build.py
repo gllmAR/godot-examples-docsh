@@ -520,7 +520,7 @@ def main():
                     progress.success(f"✅ Documentation sidebar generated: {sidebar_output}")
             
             # Inject embeds for final/production builds
-            if args.target == 'final':
+            if args.target in ['final', 'all']:
                 progress.info("🔗 Injecting game embeds into documentation...")
                 
                 if args.dry_run:
