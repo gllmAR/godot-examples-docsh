@@ -15,7 +15,7 @@ on:
       godot_version:
         description: 'Godot version to use for building'
         required: false
-        default: '4.5-beta1'
+        default: '4.5-beta3'
         type: string
 
 # Cancel in-progress runs when a new commit is pushed
