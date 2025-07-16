@@ -160,6 +160,7 @@
 
   - [Mobile VR interfae demo](/godot-demo-projects/xr/mobile_vr_interface_demo/README.md)
   - [OpenXR compositor layer demo](/godot-demo-projects/xr/openxr_composition_layers/README.md)
+  - [OpenXR Render models demo](/godot-demo-projects/xr/openxr_render_models/README.md)
   - [XR Character Body Centric Movement demo](/godot-demo-projects/xr/openxr_character_centric_movement/README.md)
   - [XR Hand Tracking Demo](/godot-demo-projects/xr/openxr_hand_tracking_demo/README.md)
   - [XR Origin Centric Movement demo](/godot-demo-projects/xr/openxr_origin_centric_movement/README.md)
