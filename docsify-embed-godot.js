@@ -412,9 +412,12 @@
       var currentHash = window.location.hash.substring(1);
       var demoPath;
       
-      // Strategy 1: Original docsify-godot-embed structure
-      if (currentHash.includes('gdEmbed/scenes/') || currentHash.includes('/scenes/')) {
-        demoPath = `gdEmbed/exports/web/?scene=${encodeURIComponent(scenePath)}`;
+      console.log('🔍 Current hash for path determination:', currentHash);
+      
+      // Strategy 1: gdEmbed structure - check if path contains gdEmbed or scenes
+      if (currentHash.includes('gdEmbed') || currentHash.includes('/scenes/')) {
+        demoPath = `godot-demo-extended/gdEmbed/exports/web/?scene=${encodeURIComponent(scenePath)}`;
+        console.log('📍 Using gdEmbed strategy');
       } 
       // Strategy 2: Individual project structure (like godot-demo-projects)
       else {
@@ -422,6 +425,7 @@
         // Remove leading slash and trailing slash/README
         var cleanHash = currentHash.replace(/^\//, '').replace(/\/(README)?$/, '');
         demoPath = `${cleanHash}/exports/web/`;
+        console.log('📍 Using individual project strategy');
       }
       
       var fullDemoUrl = baseUrl + demoPath;
