@@ -1,5 +1,6 @@
-- [godot-demo-extended](/godot-demo-extended/README.md)
+- [Universal Godot Build System](/godot-ci-build-system/README.md)
 
+- [godot-demo-extended](/godot-demo-extended/README.md)
     - [gdEmbed Demo project](/godot-demo-extended/gdEmbed/README.md)
         - [Dynamic Scene Browser Addon](/godot-demo-extended/gdEmbed/addons/dynamic_scene_browser/README.md)
       - [Interactive Godot Demos](/godot-demo-extended/gdEmbed/scenes/README.md)
@@ -32,7 +33,6 @@
           - [Shader Effects](/godot-demo-extended/gdEmbed/scenes/visual_effects/shader_effects/README.md)
 
 - [Godot demo projects](/godot-demo-projects/README.md)
-
     - [2D Demos](/godot-demo-projects/2d/README.md)
       - [Bullet Shower](/godot-demo-projects/2d/bullet_shower/README.md)
       - [Custom drawing in 2D](/godot-demo-projects/2d/custom_drawing/README.md)
