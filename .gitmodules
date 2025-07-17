@@ -4,3 +4,6 @@
 [submodule "godot-ci-build-system"]
 	path = godot-ci-build-system
 	url = https://github.com/gllmAR/godot-ci-build-system.git
+[submodule "godot-demo-extended"]
+	path = godot-demo-extended
+	url = https://github.com/gllmAR/godot-demo-extended.git
