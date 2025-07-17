@@ -3,7 +3,7 @@
 <!-- Status Badges -->
 ![Build Status](https://github.com/gllmar/godot-examples-docsh/actions/workflows/build-documentation-universal.yml/badge.svg)
 ![GitHub Pages](https://img.shields.io/website?url=https%3A%2F%2Fgllmar.github.io%2Fgodot-examples-docsh%2F&label=docs&logo=github)
-![Godot 4.5-beta1](https://img.shields.io/badge/godot-4.5--beta1-blue)
+![Godot 4.5-beta3](https://img.shields.io/badge/godot-4.5--beta3-blue)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue)
 
 A **universal, modular build system** for generating interactive documentation from Godot demo projects. Features automatic environment setup, intelligent change detection, parallel processing, and comprehensive CI/CD integration.
