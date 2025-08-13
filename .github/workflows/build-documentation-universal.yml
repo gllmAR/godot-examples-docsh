@@ -1,10 +1,6 @@
-name: 🎮 Build Godot Examples Documentation (Universal)
+name: "🎮 Build Godot Examples Documentation (Universal)"
 
-# ================================================================================================
-# 🎯 CONFIGURATION: To change the default Godot version, update '4.5-beta3' in TWO places:
-# 1. Line 22: default: '4.5-beta3' (workflow input default)
-# 2. Line 40: GODOT_VERSION fallback: '4.5-beta3' (environment variable fallback)
-# ================================================================================================
+# Single source of truth for Godot version: build_config.json
 
 on:
   push:
@@ -14,25 +10,23 @@ on:
   workflow_dispatch:
     inputs:
       force_rebuild:
-        description: 'Force rebuild all projects'
+        description: "Force rebuild all projects"
         required: false
         default: false
         type: boolean
 
-# Cancel in-progress runs when a new commit is pushed
 concurrency:
   group: main-build-documentation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-and-deploy:
-    name: 🏗️ Build & Deploy with Universal Build System
+    name: "🏗️ Build & Deploy with Universal Build System"
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: write
       id-token: write
-    
     env:
       PYTHON_VERSION: "3.11"
     steps:
@@ -43,18 +37,13 @@ jobs:
           lfs: true
 
       - name: Read Godot version from build_config.json
-        id: godot_version
+        id: read_config
         run: |
           echo "Reading Godot version from build_config.json..."
-          VERSION=$(python -c "import json; print(json.load(open('build_config.json'))['godot_version'])")
+          VERSION=$(python -c "import json,sys; print(json.load(open('build_config.json'))['godot_version'])")
+          if [ -z "$VERSION" ]; then echo "Failed to read godot_version"; exit 1; fi
           echo "GODOT_VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Read Godot version from build_config.json
-        id: godot_version
-        run: |
-          echo "Reading Godot version from build_config.json..."
-          VERSION=$(python -c "import json; print(json.load(open('build_config.json'))['godot_version'])")
-          echo "GODOT_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using Godot version: $VERSION"
 
       - name: Setup Python
         uses: actions/setup-python@v4
