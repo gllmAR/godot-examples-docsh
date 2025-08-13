@@ -1,7 +1,7 @@
 {
   "project_name": "Godot Examples Docsh",
   "project_url": "https://gllmar.github.io/godot-examples-docsh/",
-  "godot_version": "4.5-beta3",
+  "godot_version": "4.5-beta4",
   "python_version": "3.11",
   "max_parallel_jobs": null,
   "enable_web_exports": true,
